@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --admin-canvas: #e7edf2;
+  --admin-panel: #f4f7fa;
+  --admin-surface: #ffffff;
+  --admin-ink: #15202b;
+  --admin-muted: #5b6b7c;
+  --admin-line: #c9d4de;
+  --admin-accent: #0f766e;
+  --admin-accent-soft: #ccfbf1;
+  --admin-danger: #b42318;
+  --admin-sidebar: #1a2433;
+  --admin-sidebar-ink: #e8eef4;
+  --admin-sidebar-muted: #8b9aab;
+  --admin-sidebar-active: #234e52;
+
+  /*
+   * Severity palette — color + shape/letter used together (not color-alone).
+   * Tuned for stronger separation under common color-vision deficiencies:
+   * blue / gold / vermillion / deep red (avoid green↔red-only distinction).
+   */
+  --severity-low: #2f6fed;
+  --severity-medium: #b8860b;
+  --severity-high: #d94801;
+  --severity-critical: #9b1c1c;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply min-h-full;
+  }
+
+  body {
+    @apply bg-admin-canvas font-sans text-admin-ink antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-admin-accent ring-offset-2 ring-offset-admin-panel;
+  }
+}
+
+@layer components {
+  .admin-page-title {
+    @apply text-xl font-semibold tracking-tight text-admin-ink;
+  }
+
+  .admin-page-sub {
+    @apply mt-1 text-sm text-admin-muted;
+  }
+
+  .admin-btn {
+    @apply rounded border border-admin-line bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-ink transition-colors hover:border-admin-accent hover:text-admin-accent disabled:opacity-40;
+  }
+
+  .admin-btn-primary {
+    @apply rounded border border-admin-accent bg-admin-accent px-3 py-1.5 text-xs font-medium text-admin-surface transition-colors hover:bg-admin-sidebar-active disabled:opacity-50;
+  }
+
+  .admin-btn-danger {
+    @apply rounded border border-admin-danger bg-admin-danger px-3 py-1.5 text-xs font-medium text-admin-surface disabled:opacity-40;
+  }
+
+  .admin-input {
+    @apply w-full border border-admin-line bg-admin-surface px-2 py-1.5 text-sm text-admin-ink outline-none focus-visible:ring-2 focus-visible:ring-admin-accent;
+  }
+
+  .admin-chip {
+    @apply rounded border border-admin-line bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-muted transition-colors hover:text-admin-ink;
+  }
+
+  .admin-chip-active {
+    @apply rounded border border-admin-accent bg-admin-accent px-3 py-1.5 text-xs font-medium text-admin-surface;
+  }
+
+  .admin-table-wrap {
+    @apply overflow-x-auto border border-admin-line bg-admin-panel shadow-admin;
+  }
+}

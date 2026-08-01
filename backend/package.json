@@ -1,0 +1,51 @@
+{
+  "name": "dtnemergency-backend",
+  "version": "1.0.0",
+  "description": "DTNEmergency backend API",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "node src/tests/runCriticalSuite.js",
+    "sync-indexes": "node src/scripts/syncIndexes.js",
+    "seed:admin": "node scripts/seedAdmin.js",
+    "generate:cert-keypair": "node scripts/generateCertSigningKeypair.js",
+    "verify:auth-restore": "node src/scripts/verifyAuthRestore.js",
+    "verify:admin-boundary": "node src/scripts/verifyAdminBoundary.js",
+    "verify:cert-reissue": "node src/scripts/verifyCertificateReissue.js",
+    "verify:rate-limit": "node src/scripts/verifyRateLimit.js",
+    "verify:upload-idempotency": "node src/scripts/verifyUploadIdempotency.js",
+    "verify:clustering": "node src/scripts/verifyClustering.js",
+    "verify:admin-audit": "node src/scripts/verifyAdminAuditLogs.js",
+    "verify:admin-socket": "node src/scripts/verifyAdminSocket.js",
+    "verify:dashboard-live": "node src/scripts/verifyDashboardLive.js",
+    "verify:map-severity-live": "node src/scripts/verifyMapSeverityLive.js",
+    "verify:cluster-map-live": "node src/scripts/verifyClusterMapLive.js",
+    "verify:user-block-audit": "node src/scripts/verifyUserBlockFilterAudit.js",
+    "verify:reports-export-filters": "node src/scripts/verifyReportsExportFilters.js",
+    "verify:analytics": "node src/scripts/verifyAnalyticsEndpoint.js",
+    "verify:device-online": "node src/scripts/verifyDeviceOnlineFreshness.js",
+    "verify:f5-f6-audit": "node src/scripts/verifyF5F6AuditVisibility.js",
+    "verify:security-b10": "node src/scripts/verifySecurityB10.js",
+    "verify:silent-refresh": "node src/scripts/verifySilentRefresh.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.1",
+    "google-auth-library": "^9.15.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.3",
+    "socket.io": "^4.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "socket.io-client": "^4.8.3",
+    "supertest": "^7.2.2"
+  }
+}

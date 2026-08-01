@@ -1,0 +1,5 @@
+# Public certificate-signing keys may live here.
+# Never store CERT_SIGNING_PRIVATE_KEY (or any private key) in this directory or the repo.
+*
+!.gitignore
+!cert-signing-public.pem

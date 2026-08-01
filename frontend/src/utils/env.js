@@ -5,7 +5,8 @@ export const getEnv = () => {
       : {};
 
   return {
-    apiUrl: metaEnv.VITE_API_URL || 'http://localhost:5000',
-    socketUrl: metaEnv.VITE_SOCKET_URL || 'http://localhost:5000',
+    // Prefer VITE_* from .env / Vercel. Fallback matches deployed Render API.
+    apiUrl: metaEnv.VITE_API_URL || 'https://fyp-web-1k4k.onrender.com',
+    socketUrl: metaEnv.VITE_SOCKET_URL || 'https://fyp-web-1k4k.onrender.com',
   };
 };

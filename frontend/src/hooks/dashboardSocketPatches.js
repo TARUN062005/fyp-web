@@ -5,6 +5,8 @@
 
 export const AdminSocketEvents = {
   REPORT_CREATED: 'report:created',
+  REPORT_UPDATED: 'report:updated',
+  REPORT_CONSENSUS: 'report:consensus',
   CLUSTER_CREATED: 'cluster:created',
   CLUSTER_UPDATED: 'cluster:updated',
   CLUSTER_VERIFIED: 'cluster:verified',
@@ -29,6 +31,8 @@ export const applyDashboardSocketEvent = (summary, event, payload) => {
       };
     case AdminSocketEvents.CLUSTER_UPDATED:
     case AdminSocketEvents.REPORT_CREATED:
+    case AdminSocketEvents.REPORT_UPDATED:
+    case AdminSocketEvents.REPORT_CONSENSUS:
       return { ...s, generatedAt: now };
     case AdminSocketEvents.CLUSTER_MERGED:
       return {

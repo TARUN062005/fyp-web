@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.routes.js';
 import broadcastRoutes from './routes/broadcast.routes.js';
 import sosRoutes from './routes/sos.routes.js';
 import clusterRoutes from './routes/cluster.routes.js';
+import voteRoutes from './routes/vote.routes.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/admin', adminRoutes);
 app.use('/broadcast', broadcastRoutes);
 app.use('/sos', sosRoutes);
 app.use('/clusters', clusterRoutes);
+app.use('/votes', voteRoutes);
 app.use('/api', indexRoutes);
 
 app.use(notFound);

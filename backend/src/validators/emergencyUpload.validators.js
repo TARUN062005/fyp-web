@@ -42,4 +42,5 @@ export const emergencyUploadBodySchema = z.object({
   severity: severitySchema,
   location: geoPointSchema,
   timestamp: z.union([z.string().datetime(), z.coerce.date()]),
+  hopCount: z.coerce.number().int().min(0).max(10_000).optional().default(0),
 });

@@ -57,6 +57,7 @@ const ReportsPage = () => {
   const [exporting, setExporting] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
 
   const queryFilters = useMemo(
     () => ({
@@ -78,6 +79,7 @@ const ReportsPage = () => {
   const reports = data?.reports ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+  const selected = reports.find((r) => r.id === selectedId) || null;
 
   const setField = (key) => (e) => {
     setDraft((d) => ({ ...d, [key]: e.target.value }));
@@ -296,16 +298,17 @@ const ReportsPage = () => {
               <th className="px-3 py-2 font-medium">Message</th>
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 font-medium">Severity</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Uploads</th>
+              <th className="px-3 py-2 font-medium">Hops</th>
               <th className="px-3 py-2 font-medium">Timestamp</th>
-              <th className="px-3 py-2 font-medium">Location</th>
               <th className="px-3 py-2 font-medium">Sender</th>
-              <th className="px-3 py-2 font-medium">Uploader</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && !reports.length ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-admin-muted">
+                <td colSpan={8} className="px-3 py-6 text-admin-muted">
                   Loading reports…
                 </td>
               </tr>
@@ -313,50 +316,124 @@ const ReportsPage = () => {
 
             {!isLoading && !reports.length ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-admin-muted">
+                <td colSpan={8} className="px-3 py-6 text-admin-muted">
                   No reports match the current filters.
                 </td>
               </tr>
             ) : null}
 
-            {reports.map((r) => {
-              const [lng, lat] = r.location?.coordinates || [];
-              return (
-                <tr
-                  key={r.id}
-                  className="border-b border-admin-line/80 hover:bg-admin-surface/60"
+            {reports.map((r) => (
+              <tr
+                key={r.id}
+                className={[
+                  'cursor-pointer border-b border-admin-line/80 hover:bg-admin-surface/60',
+                  selectedId === r.id ? 'bg-admin-surface/80' : '',
+                ].join(' ')}
+                onClick={() =>
+                  setSelectedId((id) => (id === r.id ? null : r.id))
+                }
+              >
+                <td className="px-3 py-2 font-mono text-xs">{r.messageId}</td>
+                <td className="px-3 py-2">{r.emergencyType}</td>
+                <td className="px-3 py-2">
+                  <SeverityBadge severity={r.severity} />
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {r.verificationStatus || 'UNVERIFIED'}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs">
+                  {r.uploadCount ?? 1}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs">
+                  {r.hopCount ?? 0}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs">
+                  {fmt(r.timestamp)}
+                </td>
+                <td
+                  className="px-3 py-2 font-mono text-xs"
+                  title={r.originalSenderId}
                 >
-                  <td className="px-3 py-2 font-mono text-xs">{r.messageId}</td>
-                  <td className="px-3 py-2">{r.emergencyType}</td>
-                  <td className="px-3 py-2">
-                    <SeverityBadge severity={r.severity} />
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {fmt(r.timestamp)}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {Number.isFinite(lng) && Number.isFinite(lat)
-                      ? `${lng.toFixed(4)}, ${lat.toFixed(4)}`
-                      : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2 font-mono text-xs"
-                    title={r.originalSenderId}
-                  >
-                    {shortId(r.originalSenderId)}
-                  </td>
-                  <td
-                    className="px-3 py-2 font-mono text-xs"
-                    title={r.uploaderId}
-                  >
-                    {shortId(r.uploaderId)}
-                  </td>
-                </tr>
-              );
-            })}
+                  {shortId(r.originalSenderId)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+
+      {selected ? (
+        <div className="mt-4 rounded border border-admin-line bg-admin-panel p-4 text-sm shadow-admin">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-admin-muted">
+                Report audit
+              </p>
+              <h2 className="mt-1 font-mono text-sm font-semibold">
+                {selected.messageId}
+              </h2>
+            </div>
+            <button
+              type="button"
+              className="admin-btn"
+              onClick={() => setSelectedId(null)}
+            >
+              Close
+            </button>
+          </div>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-admin-muted">Original sender</dt>
+              <dd className="font-mono text-xs">{selected.originalSenderId}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">First uploader</dt>
+              <dd className="font-mono text-xs">{selected.uploaderId}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">Uploaders</dt>
+              <dd className="font-mono text-xs break-all">
+                {(selected.uploaders || []).join(', ') || '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">Counts</dt>
+              <dd className="font-mono text-xs">
+                uploads {selected.uploadCount ?? 1} · relays{' '}
+                {selected.relayCount ?? 0} · hops {selected.hopCount ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">Verification</dt>
+              <dd className="text-xs">
+                {selected.verificationStatus || 'UNVERIFIED'} · confidence{' '}
+                {Math.round((selected.confidenceScore || 0) * 100)}%
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">Votes</dt>
+              <dd className="text-xs">
+                True {selected.trueVotes ?? 0} ({selected.truePercent ?? 0}%) ·
+                False {selected.falseVotes ?? 0} ({selected.falsePercent ?? 0}%) ·
+                Unknown {selected.unknownVotes ?? 0} (
+                {selected.unknownPercent ?? 0}%)
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">First / last upload</dt>
+              <dd className="font-mono text-xs">
+                {fmt(selected.firstUploadedAt)} → {fmt(selected.lastUploadedAt)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-admin-muted">Location</dt>
+              <dd className="font-mono text-xs">
+                {(selected.location?.coordinates || []).join(', ') || '—'}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
     </section>
   );
 };

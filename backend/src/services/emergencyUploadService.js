@@ -3,6 +3,10 @@ import EmergencyReport from '../models/EmergencyReport.js';
 import { AppError } from '../utils/asyncHandler.js';
 import { enqueueForClustering } from './clusteringService.js';
 import { AdminSocketEvents, emitToAdmin } from './adminRealtime.js';
+import {
+  recomputeRelayCount,
+  toEmergencyReportDto,
+} from './emergencyReportDto.js';
 
 /** Reject reports older than this (Android emergency TTL / relay freshness). */
 const MAX_AGE_MS = Number(process.env.REPORT_TIMESTAMP_MAX_AGE_MS) || 48 * 60 * 60 * 1000;
@@ -10,18 +14,7 @@ const MAX_AGE_MS = Number(process.env.REPORT_TIMESTAMP_MAX_AGE_MS) || 48 * 60 * 
 const FUTURE_SKEW_MS =
   Number(process.env.REPORT_TIMESTAMP_FUTURE_SKEW_MS) || 15 * 60 * 1000;
 
-const toReportDto = (report) => ({
-  id: String(report._id),
-  messageId: report.messageId,
-  originalSenderId: String(report.originalSenderId),
-  uploaderId: String(report.uploaderId),
-  emergencyType: report.emergencyType,
-  severity: report.severity,
-  location: report.location,
-  timestamp: report.timestamp,
-  clusterId: report.clusterId ? String(report.clusterId) : null,
-  createdAt: report.createdAt,
-});
+const toReportDto = toEmergencyReportDto;
 
 const assertValidObjectId = (value, field) => {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -55,15 +48,66 @@ const assertTimestampWindow = (timestamp) => {
   return ts;
 };
 
+const normalizeHopCount = (hopCount) => {
+  if (hopCount === undefined || hopCount === null) return 0;
+  const n = Number(hopCount);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new AppError('hopCount must be a non-negative integer', 400);
+  }
+  return Math.floor(n);
+};
+
+/**
+ * Merge a duplicate upload into an existing report (no second document).
+ */
+const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
+  const uploaderOid = new mongoose.Types.ObjectId(String(uploaderId));
+  const uploaderSet = new Set(
+    (existing.uploaders || []).map((id) => String(id))
+  );
+  uploaderSet.add(String(uploaderId));
+  if (existing.uploaderId) {
+    uploaderSet.add(String(existing.uploaderId));
+  }
+  const uploaders = [...uploaderSet].map(
+    (id) => new mongoose.Types.ObjectId(id)
+  );
+  const uploadCount = uploaders.length;
+  const relayCount = recomputeRelayCount(uploaders, existing.originalSenderId);
+  const nextHop = Math.max(Number(existing.hopCount) || 0, hopCount);
+  const now = new Date();
+
+  existing.uploaders = uploaders;
+  existing.uploadCount = uploadCount;
+  existing.relayCount = relayCount;
+  existing.hopCount = nextHop;
+  existing.lastUploadedAt = now;
+  if (!existing.firstUploadedAt) {
+    existing.firstUploadedAt = existing.createdAt || now;
+  }
+  // Keep first uploaderId as historical first uploader
+  await existing.save();
+
+  emitToAdmin(AdminSocketEvents.REPORT_UPDATED, {
+    report: toReportDto(existing),
+  });
+
+  return {
+    report: toReportDto(existing),
+    created: false,
+    deduplicated: true,
+  };
+};
+
 /**
  * Offline→online relay upload.
  *
- * Replay / duplicate protection (B6 + B10):
- * 1. messageId uniqueness — lookup + unique index; duplicates return the
- *    existing report (idempotent), never a second document.
+ * Replay / duplicate protection:
+ * 1. messageId uniqueness — lookup + unique index; duplicates merge counters
+ *    (uploaders, uploadCount, relayCount, hopCount) — never a second document.
  * 2. timestamp window — reject if older than REPORT_TIMESTAMP_MAX_AGE_MS
  *    (default 48h) or more than REPORT_TIMESTAMP_FUTURE_SKEW_MS ahead
- *    (default 15m).
+ *    (default 15m). Applied on create only.
  */
 export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
   const {
@@ -74,6 +118,7 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     severity,
     location,
     timestamp,
+    hopCount: rawHopCount,
   } = payload;
 
   assertValidObjectId(originalSenderId, 'originalSenderId');
@@ -83,23 +128,41 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     throw new AppError('uploaderId must match the authenticated user', 403);
   }
 
+  const hopCount = normalizeHopCount(rawHopCount);
+
   const existing = await EmergencyReport.findOne({ messageId });
   if (existing) {
-    return {
-      report: toReportDto(existing),
-      created: false,
-      deduplicated: true,
-    };
+    return mergeDuplicateUpload(existing, uploaderId, hopCount);
   }
 
   const normalizedTimestamp = assertTimestampWindow(timestamp);
+  const now = new Date();
+  const uploaderOid = new mongoose.Types.ObjectId(String(uploaderId));
+  const originOid = new mongoose.Types.ObjectId(String(originalSenderId));
+  const uploaders = [uploaderOid];
+  if (String(uploaderId) !== String(originalSenderId)) {
+    // Origin may not be in uploaders yet if only a relay uploaded
+  }
+  const relayCount = recomputeRelayCount(uploaders, originalSenderId);
 
   let report;
   try {
     report = await EmergencyReport.create({
       messageId,
-      originalSenderId,
-      uploaderId,
+      originalSenderId: originOid,
+      uploaderId: uploaderOid,
+      uploaders,
+      uploadCount: uploaders.length,
+      relayCount,
+      hopCount,
+      firstUploadedAt: now,
+      lastUploadedAt: now,
+      syncStatus: 'PENDING_CONSENSUS',
+      trueVotes: 0,
+      falseVotes: 0,
+      unknownVotes: 0,
+      confidenceScore: 0,
+      verificationStatus: 'UNVERIFIED',
       emergencyType,
       severity,
       location,
@@ -111,11 +174,7 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     if (err?.code === 11000 && err?.keyPattern?.messageId) {
       const raced = await EmergencyReport.findOne({ messageId });
       if (raced) {
-        return {
-          report: toReportDto(raced),
-          created: false,
-          deduplicated: true,
-        };
+        return mergeDuplicateUpload(raced, uploaderId, hopCount);
       }
     }
     throw err;

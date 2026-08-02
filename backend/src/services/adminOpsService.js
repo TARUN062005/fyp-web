@@ -14,6 +14,7 @@ import {
 } from './clusteringService.js';
 import { AdminSocketEvents, emitToAdmin } from './adminRealtime.js';
 import { DEVICE_ONLINE_MS } from './devicePresenceService.js';
+import { toEmergencyReportDto } from './emergencyReportDto.js';
 
 const toObjectId = (value, field) => {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -231,18 +232,7 @@ const buildReportFilter = async ({
   return filter;
 };
 
-const toReportDto = (report) => ({
-  id: String(report._id),
-  messageId: report.messageId,
-  originalSenderId: String(report.originalSenderId),
-  uploaderId: String(report.uploaderId),
-  emergencyType: report.emergencyType,
-  severity: report.severity,
-  location: report.location,
-  timestamp: report.timestamp,
-  clusterId: report.clusterId ? String(report.clusterId) : null,
-  createdAt: report.createdAt,
-});
+const toReportDto = (report) => toEmergencyReportDto(report);
 
 export const listReports = async (query) => {
   const page = Math.max(1, Number(query.page) || 1);
@@ -292,6 +282,14 @@ export const exportReports = async (query) => {
       'messageId',
       'originalSenderId',
       'uploaderId',
+      'uploadCount',
+      'relayCount',
+      'hopCount',
+      'verificationStatus',
+      'confidenceScore',
+      'trueVotes',
+      'falseVotes',
+      'unknownVotes',
       'emergencyType',
       'severity',
       'lng',
@@ -308,6 +306,14 @@ export const exportReports = async (query) => {
           r.messageId,
           r.originalSenderId,
           r.uploaderId,
+          r.uploadCount,
+          r.relayCount,
+          r.hopCount,
+          r.verificationStatus,
+          r.confidenceScore,
+          r.trueVotes,
+          r.falseVotes,
+          r.unknownVotes,
           r.emergencyType,
           r.severity,
           r.location?.coordinates?.[0],

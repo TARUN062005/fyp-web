@@ -1,10 +1,12 @@
 import { Server } from 'socket.io';
 import env from './env.js';
-import { verifyAdminToken } from '../utils/jwt.js';
+import { verifyAdminToken, verifyToken } from '../utils/jwt.js';
 import AdminUser from '../models/AdminUser.js';
+import User from '../models/User.js';
 
 let io = null;
 let adminNamespace = null;
+let mobileNamespace = null;
 
 const extractToken = (socket) => {
   const fromAuth = socket.handshake.auth?.token;
@@ -23,8 +25,8 @@ const extractToken = (socket) => {
 
 /**
  * Socket.IO attached to the HTTP server.
- * Only the `/admin` namespace accepts connections — gated by admin JWT
- * (same trust boundary as B4 HTTP admin auth). No mobile namespace yet.
+ * - `/admin` — admin JWT
+ * - `/mobile` — mobile user JWT (consensus push)
  */
 export const initSocket = (httpServer) => {
   io = new Server(httpServer, {
@@ -84,9 +86,51 @@ export const initSocket = (httpServer) => {
     });
   });
 
+  mobileNamespace = io.of('/mobile');
+
+  mobileNamespace.use(async (socket, next) => {
+    try {
+      const token = extractToken(socket);
+      if (!token) {
+        return next(new Error('Unauthorized: mobile JWT required'));
+      }
+
+      const decoded = verifyToken(token);
+      if (!decoded.userId) {
+        return next(new Error('Unauthorized: invalid mobile token'));
+      }
+
+      const user = await User.findById(decoded.userId).select('_id isBlocked');
+      if (!user) {
+        return next(new Error('Unauthorized: user not found'));
+      }
+      if (user.isBlocked) {
+        return next(new Error('Forbidden: account blocked'));
+      }
+
+      socket.user = { userId: String(user._id) };
+      return next();
+    } catch {
+      return next(new Error('Unauthorized: invalid mobile token'));
+    }
+  });
+
+  mobileNamespace.on('connection', (socket) => {
+    console.log(
+      `[socket:/mobile] Connected ${socket.id} user=${socket.user.userId}`
+    );
+    socket.on('disconnect', (reason) => {
+      console.log(
+        `[socket:/mobile] Disconnected ${socket.id} reason=${reason}`
+      );
+    });
+  });
+
   return io;
 };
 
 export const getIO = () => io;
 
 export const getAdminNamespace = () => adminNamespace;
+
+export const getMobileNamespace = () => mobileNamespace;

@@ -46,6 +46,13 @@ export const useAdminSocket = (enabled = true) => {
           applyClustersSocketEvent(prev, event, payload)
         );
       });
+      if (
+        event === AdminSocketEvents.REPORT_CREATED ||
+        event === AdminSocketEvents.REPORT_UPDATED ||
+        event === AdminSocketEvents.REPORT_CONSENSUS
+      ) {
+        queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
+      }
     };
 
     Object.values(AdminSocketEvents).forEach((event) => {

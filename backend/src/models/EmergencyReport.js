@@ -5,6 +5,18 @@ import {
   SEVERITY_VALUES,
 } from '../config/emergencyEnums.js';
 
+export const VERIFICATION_STATUS_VALUES = [
+  'UNVERIFIED',
+  'PARTIALLY_VERIFIED',
+  'VERIFIED',
+  'FALSE_REPORT',
+];
+
+export const REPORT_SYNC_STATUS_VALUES = [
+  'PENDING_CONSENSUS',
+  'SYNCED',
+];
+
 const emergencyReportSchema = new mongoose.Schema(
   {
     // Idempotency key for duplicate-safe uploads
@@ -19,10 +31,77 @@ const emergencyReportSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    /** First uploader (legacy field; also always present in uploaders[]). */
     uploaderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
+    },
+    uploaders: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+      ],
+      default: [],
+    },
+    uploadCount: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
+    /** Successful uploads where uploader ≠ originalSender. */
+    relayCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    hopCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    firstUploadedAt: {
+      type: Date,
+      default: null,
+    },
+    lastUploadedAt: {
+      type: Date,
+      default: null,
+    },
+    syncStatus: {
+      type: String,
+      enum: REPORT_SYNC_STATUS_VALUES,
+      default: 'PENDING_CONSENSUS',
+      index: true,
+    },
+    trueVotes: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    falseVotes: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    unknownVotes: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    confidenceScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 1,
+    },
+    verificationStatus: {
+      type: String,
+      enum: VERIFICATION_STATUS_VALUES,
+      default: 'UNVERIFIED',
       index: true,
     },
     emergencyType: {

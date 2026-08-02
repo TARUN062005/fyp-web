@@ -9,7 +9,6 @@ export const useBlockUser = () => {
     mutationFn: ({ userId, reason }) => blockUser({ userId, reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'audit-logs'] });
       queryClient.invalidateQueries({ queryKey: DASHBOARD_SUMMARY_QUERY_KEY });
     },
   });
@@ -22,7 +21,6 @@ export const useUnblockUser = () => {
     mutationFn: ({ userId }) => unblockUser({ userId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'audit-logs'] });
       queryClient.invalidateQueries({ queryKey: DASHBOARD_SUMMARY_QUERY_KEY });
     },
   });

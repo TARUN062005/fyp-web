@@ -8,9 +8,6 @@ import ClustersPage from './pages/ClustersPage.jsx';
 import ClusterDetailPage from './pages/ClusterDetailPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
-import AnalyticsPage from './pages/AnalyticsPage.jsx';
-import DevicesPage from './pages/DevicesPage.jsx';
-import AuditLogsPage from './pages/AuditLogsPage.jsx';
 
 function App() {
   return (
@@ -26,9 +23,6 @@ function App() {
           <Route path="/clusters/:clusterId" element={<ClusterDetailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/devices" element={<DevicesPage />} />
-          <Route path="/audit-logs" element={<AuditLogsPage />} />
         </Route>
       </Route>
 

@@ -9,9 +9,6 @@ const navItems = [
   { to: '/clusters', label: 'Clusters' },
   { to: '/users', label: 'Users' },
   { to: '/reports', label: 'Reports' },
-  { to: '/analytics', label: 'Analytics' },
-  { to: '/devices', label: 'Devices' },
-  { to: '/audit-logs', label: 'Audit logs' },
 ];
 
 const AdminLayout = () => {

@@ -43,10 +43,14 @@ const publicUser = (user) => ({
   id: String(user._id),
   emergencyId: user.emergencyId,
   displayName: user.displayName,
+  phoneNumber: user.phoneNumber ?? null,
+  emergencyContact: user.emergencyContact?.phoneNumber ?? null,
+  emergencyContactDetail: user.emergencyContact ?? null,
   isVerified: user.isVerified,
   isBlocked: user.isBlocked,
   lastSeenAt: user.lastSeenAt,
   createdAt: user.createdAt,
+  updatedAt: user.updatedAt ?? null,
   publicKeyFingerprint: user.publicKeyFingerprint,
 });
 

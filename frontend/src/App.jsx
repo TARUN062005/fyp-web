@@ -32,6 +32,7 @@ function App() {
         </Route>
       </Route>
 
+      {/* Unknown paths → dashboard (ProtectedRoute sends guests to /login). */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

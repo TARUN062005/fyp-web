@@ -21,12 +21,33 @@ const fingerprintPublicKey = (publicKey) =>
 const toPublicProfile = (user) => ({
   emergencyId: user.emergencyId,
   displayName: user.displayName,
+  phoneNumber: user.phoneNumber ?? null,
   publicKeyFingerprint: user.publicKeyFingerprint,
   emergencyContact: user.emergencyContact ?? null,
   isVerified: user.isVerified,
   createdAt: user.createdAt,
+  updatedAt: user.updatedAt ?? null,
   lastSeenAt: user.lastSeenAt,
 });
+
+/** Flat DTO for PATCH /profile success body (FYP Android contract). */
+const toProfileUpdateDto = (user) => ({
+  emergencyId: user.emergencyId,
+  displayName: user.displayName,
+  phoneNumber: user.phoneNumber ?? null,
+  emergencyContact: user.emergencyContact?.phoneNumber ?? null,
+  updatedAt:
+    user.updatedAt instanceof Date
+      ? user.updatedAt.toISOString()
+      : user.updatedAt ?? new Date().toISOString(),
+});
+
+const normalizeOptionalPhone = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length === 0 ? null : trimmed;
+};
 
 const assertNotBlocked = (user) => {
   if (user.isBlocked) {
@@ -194,6 +215,44 @@ export const getProfileForUserId = async (userId) => {
   }
   assertNotBlocked(user);
   return toPublicProfile(user);
+};
+
+/**
+ * PATCH /profile — update display name + optional phones for the authenticated user.
+ * Does not accept publicKey / emergencyId changes.
+ */
+export const updateProfileForUserId = async (userId, patch) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+  assertNotBlocked(user);
+
+  const displayName = String(patch.displayName || '').trim();
+  if (!displayName) {
+    throw new AppError('displayName is required', 400);
+  }
+  user.displayName = displayName;
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'phoneNumber')) {
+    user.phoneNumber = normalizeOptionalPhone(patch.phoneNumber);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'emergencyContact')) {
+    const contactPhone = normalizeOptionalPhone(patch.emergencyContact);
+    if (contactPhone === null) {
+      user.set('emergencyContact', undefined);
+      user.markModified('emergencyContact');
+    } else if (contactPhone !== undefined) {
+      user.emergencyContact = {
+        name: user.emergencyContact?.name || undefined,
+        phoneNumber: contactPhone,
+      };
+    }
+  }
+
+  await user.save();
+  return toProfileUpdateDto(user);
 };
 
 export const getCertificateForUserId = async (userId) => {

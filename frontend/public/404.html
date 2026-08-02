@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="0;url=/" />
+    <script>
+      // SPA fallback for hosts that serve 404.html on unknown paths.
+      sessionStorage.setItem('spa-redirect', location.pathname + location.search + location.hash);
+      location.replace('/');
+    </script>
+    <title>Redirecting…</title>
+  </head>
+  <body>
+    <p>Redirecting…</p>
+  </body>
+</html>

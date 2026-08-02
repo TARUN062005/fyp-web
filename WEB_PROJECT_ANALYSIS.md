@@ -693,7 +693,35 @@ Headers: `Authorization: Bearer <mobile access>`; optional `X-Device-Id`, `X-App
 
 #### `GET /profile`
 
-→ public profile DTO
+→ public profile DTO (`emergencyId`, `displayName`, `phoneNumber`, `publicKeyFingerprint`, nested `emergencyContact` `{ name?, phoneNumber? }`, `isVerified`, dates)
+
+#### `PATCH /profile`
+
+**Body:**
+
+```json
+{
+  "displayName": "Tarun",
+  "phoneNumber": "+91xxxxxxxxxx",
+  "emergencyContact": "+91yyyyyyyyyy"
+}
+```
+
+- `displayName` required (non-blank)
+- `phoneNumber` / `emergencyContact` optional; string phone or `null` to clear
+- `emergencyContact` request field is a **phone string**; stored as `{ phoneNumber }` on User
+
+**Response `data`:**
+
+```json
+{
+  "emergencyId": "EDTN-XXXXX",
+  "displayName": "Tarun",
+  "phoneNumber": "+91xxxxxxxxxx",
+  "emergencyContact": "+91yyyyyyyyyy",
+  "updatedAt": "2026-08-02T10:30:00.000Z"
+}
+```
 
 #### `GET /profile/certificate`
 

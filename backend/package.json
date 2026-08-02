@@ -28,7 +28,8 @@
     "verify:device-online": "node src/scripts/verifyDeviceOnlineFreshness.js",
     "verify:f5-f6-audit": "node src/scripts/verifyF5F6AuditVisibility.js",
     "verify:security-b10": "node src/scripts/verifySecurityB10.js",
-    "verify:silent-refresh": "node src/scripts/verifySilentRefresh.js"
+    "verify:silent-refresh": "node src/scripts/verifySilentRefresh.js",
+    "verify:profile-patch": "node src/scripts/verifyProfilePatch.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

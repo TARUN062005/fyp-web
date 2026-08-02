@@ -14,11 +14,12 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const from = location.state?.from || '/dashboard';
+
+  // Already signed in (in-tab session) — resume the page they wanted.
+  if (isAuthenticated) {
+    return <Navigate to={from} replace />;
+  }
 
   const onSubmit = async (event) => {
     event.preventDefault();

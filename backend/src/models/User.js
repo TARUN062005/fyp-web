@@ -26,6 +26,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
       required: true,
     },
+    /** Optional personal phone (PATCH /profile). Distinct from emergencyContact. */
+    phoneNumber: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     publicKey: {
       type: String,
       required: true,
@@ -54,7 +60,7 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: { createdAt: true, updatedAt: false },
+    timestamps: { createdAt: true, updatedAt: true },
     collection: 'users',
   }
 );

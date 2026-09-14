@@ -6,6 +6,11 @@ export const loginAdmin = async ({ email, password }) => {
   return data.data;
 };
 
+export const fetchAdminMe = async () => {
+  const { data } = await api.get('/admin/me');
+  return data.data;
+};
+
 export const refreshAdminSession = async (refreshToken) => {
   const { data } = await api.post('/admin/auth/refresh', { refreshToken });
   return data.data;

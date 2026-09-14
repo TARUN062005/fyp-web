@@ -53,10 +53,27 @@ export const useAdminSocket = (enabled = true) => {
       ) {
         queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
       }
+      if (
+        event === AdminSocketEvents.USER_BLOCKED ||
+        event === AdminSocketEvents.USER_UNBLOCKED ||
+        event === AdminSocketEvents.USER_CREATED ||
+        event === AdminSocketEvents.DEVICE_STATUS
+      ) {
+        queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      }
     };
 
     Object.values(AdminSocketEvents).forEach((event) => {
       socket.on(event, onEvent(event));
+    });
+
+    let initialConnect = true;
+    socket.on('connect', () => {
+      if (initialConnect) {
+        initialConnect = false;
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
     });
 
     return () => {

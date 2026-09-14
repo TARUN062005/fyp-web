@@ -12,6 +12,7 @@ export const AdminSocketEvents = {
   DEVICE_STATUS: 'device:status',
   USER_BLOCKED: 'user:blocked',
   USER_UNBLOCKED: 'user:unblocked',
+  USER_CREATED: 'user:created',
 };
 
 /**

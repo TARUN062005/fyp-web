@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore.js';
 describe('ProtectedRoute', () => {
   beforeEach(() => {
     useAuthStore.setState({
+      status: 'ready',
       accessToken: null,
       refreshToken: null,
       admin: null,
@@ -31,6 +32,7 @@ describe('ProtectedRoute', () => {
 
   it('allows authenticated users to reach the protected route', () => {
     useAuthStore.setState({
+      status: 'ready',
       accessToken: 'test-access-token',
       refreshToken: 'test-refresh-token',
       admin: { email: 'admin@test.local', role: 'admin' },
@@ -49,5 +51,29 @@ describe('ProtectedRoute', () => {
 
     expect(container).toHaveTextContent('Dashboard screen');
     expect(container).not.toHaveTextContent('Login screen');
+  });
+
+  it('does not redirect to /login while the session is hydrating', () => {
+    useAuthStore.setState({
+      status: 'hydrating',
+      accessToken: null,
+      refreshToken: 'pending-refresh',
+      admin: null,
+    });
+
+    const { queryByText, getByText } = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="/login" element={<div>Login screen</div>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<div>Dashboard screen</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(getByText('Restoring session…')).toBeInTheDocument();
+    expect(queryByText('Login screen')).not.toBeInTheDocument();
+    expect(queryByText('Dashboard screen')).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import EmergencyReport from '../models/EmergencyReport.js';
+import User from '../models/User.js';
 import { AppError } from '../utils/asyncHandler.js';
 import { enqueueForClustering } from './clusteringService.js';
 import { AdminSocketEvents, emitToAdmin } from './adminRealtime.js';
@@ -13,6 +14,7 @@ const MAX_AGE_MS = Number(process.env.REPORT_TIMESTAMP_MAX_AGE_MS) || 48 * 60 * 
 /** Allow limited future skew for device clock drift. */
 const FUTURE_SKEW_MS =
   Number(process.env.REPORT_TIMESTAMP_FUTURE_SKEW_MS) || 15 * 60 * 1000;
+const MAX_HOP_COUNT = 5;
 
 const toReportDto = toEmergencyReportDto;
 
@@ -57,9 +59,25 @@ const normalizeHopCount = (hopCount) => {
   return Math.floor(n);
 };
 
+const assertHopWithinLimit = (hopCount) => {
+  if (hopCount > MAX_HOP_COUNT) {
+    throw new AppError(`hopCount exceeds max hop (${MAX_HOP_COUNT})`, 400);
+  }
+  return hopCount;
+};
+
 /**
  * Merge a duplicate upload into an existing report (no second document).
  */
+const assertSameOriginalSender = (existing, originalSenderId) => {
+  if (String(existing.originalSenderId) !== String(originalSenderId)) {
+    throw new AppError(
+      'messageId already bound to a different original sender',
+      409
+    );
+  }
+};
+
 const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
   const uploaderOid = new mongoose.Types.ObjectId(String(uploaderId));
   const uploaderSet = new Set(
@@ -119,6 +137,7 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     location,
     timestamp,
     hopCount: rawHopCount,
+    senderPublicKey,
   } = payload;
 
   assertValidObjectId(originalSenderId, 'originalSenderId');
@@ -130,19 +149,35 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
 
   const hopCount = normalizeHopCount(rawHopCount);
 
+  const originUser = await User.findById(originalSenderId);
+  if (!originUser) {
+    throw new AppError('original sender is unknown', 400);
+  }
+  if (
+    senderPublicKey &&
+    originUser.publicKey &&
+    String(originUser.publicKey).trim() !== String(senderPublicKey).trim()
+  ) {
+    throw new AppError('senderPublicKey does not match original sender identity', 403);
+  }
+
   const existing = await EmergencyReport.findOne({ messageId });
   if (existing) {
-    return mergeDuplicateUpload(existing, uploaderId, hopCount);
+    assertSameOriginalSender(existing, originalSenderId);
+    return mergeDuplicateUpload(
+      existing,
+      uploaderId,
+      Math.min(hopCount, MAX_HOP_COUNT)
+    );
   }
+
+  assertHopWithinLimit(hopCount);
 
   const normalizedTimestamp = assertTimestampWindow(timestamp);
   const now = new Date();
   const uploaderOid = new mongoose.Types.ObjectId(String(uploaderId));
   const originOid = new mongoose.Types.ObjectId(String(originalSenderId));
   const uploaders = [uploaderOid];
-  if (String(uploaderId) !== String(originalSenderId)) {
-    // Origin may not be in uploaders yet if only a relay uploaded
-  }
   const relayCount = recomputeRelayCount(uploaders, originalSenderId);
 
   let report;
@@ -174,7 +209,12 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     if (err?.code === 11000 && err?.keyPattern?.messageId) {
       const raced = await EmergencyReport.findOne({ messageId });
       if (raced) {
-        return mergeDuplicateUpload(raced, uploaderId, hopCount);
+        assertSameOriginalSender(raced, originalSenderId);
+        return mergeDuplicateUpload(
+          raced,
+          uploaderId,
+          Math.min(hopCount, MAX_HOP_COUNT)
+        );
       }
     }
     throw err;

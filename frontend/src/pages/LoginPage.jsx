@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore, selectIsAuthenticated } from '../store/authStore.js';
+import { useAuthStore, selectIsAuthenticated, selectAuthStatus } from '../store/authStore.js';
 import { loginAdmin } from '../services/authService.js';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isAuthenticated = useAuthStore(selectIsAuthenticated);
+  const status = useAuthStore(selectAuthStatus);
   const setSession = useAuthStore((s) => s.setSession);
 
   const [email, setEmail] = useState('');
@@ -16,7 +17,15 @@ const LoginPage = () => {
 
   const from = location.state?.from || '/dashboard';
 
-  // Already signed in (in-tab session) — resume the page they wanted.
+  if (status === 'hydrating') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-admin-canvas px-4 text-sm text-admin-muted">
+        Restoring session…
+      </div>
+    );
+  }
+
+  // Already signed in (restored tab session) — resume the page they wanted.
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
   }
@@ -27,7 +36,6 @@ const LoginPage = () => {
     setSubmitting(true);
     try {
       const data = await loginAdmin({ email, password });
-      // In-memory only — access + refresh tokens never written to localStorage
       setSession({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,

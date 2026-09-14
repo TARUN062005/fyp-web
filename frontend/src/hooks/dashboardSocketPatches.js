@@ -14,6 +14,7 @@ export const AdminSocketEvents = {
   DEVICE_STATUS: 'device:status',
   USER_BLOCKED: 'user:blocked',
   USER_UNBLOCKED: 'user:unblocked',
+  USER_CREATED: 'user:created',
 };
 
 export const applyDashboardSocketEvent = (summary, event, payload) => {
@@ -38,6 +39,12 @@ export const applyDashboardSocketEvent = (summary, event, payload) => {
       return {
         ...s,
         activeEmergencies: Math.max((s.activeEmergencies ?? 1) - 1, 0),
+        generatedAt: now,
+      };
+    case AdminSocketEvents.USER_CREATED:
+      return {
+        ...s,
+        verifiedUsers: (s.verifiedUsers ?? 0) + 1,
         generatedAt: now,
       };
     case AdminSocketEvents.USER_BLOCKED:

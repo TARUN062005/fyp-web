@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import User from '../models/User.js';
 import { AppError } from '../utils/asyncHandler.js';
+import { AdminSocketEvents, emitToAdmin } from './adminRealtime.js';
 import { verifyGoogleIdToken } from './googleAuthService.js';
 import {
   issueCertificate,
@@ -187,6 +188,17 @@ export const authenticateWithGoogle = async (
 
   const certificate = await issueCertificate(user.emergencyId, publicKey);
   const session = await completeSession(user);
+  emitToAdmin(AdminSocketEvents.USER_CREATED, {
+    user: {
+      id: String(user._id),
+      emergencyId: user.emergencyId,
+      displayName: user.displayName,
+      isVerified: user.isVerified,
+      isBlocked: user.isBlocked,
+      createdAt: user.createdAt,
+      publicKeyFingerprint: user.publicKeyFingerprint,
+    },
+  });
   return {
     ...session,
     status: 'created',

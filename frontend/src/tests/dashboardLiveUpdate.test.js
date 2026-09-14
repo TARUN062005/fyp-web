@@ -76,4 +76,20 @@ describe('dashboard live socket patches (no refetch)', () => {
     expect(fromUpdate.activeEmergencies).toBe(4);
     expect(fromUpdate.clustersToday).toBe(2);
   });
+
+  it('increments verified users on user:created', () => {
+    const before = {
+      activeEmergencies: 1,
+      clustersToday: 0,
+      verifiedUsers: 4,
+      blockedUsers: 0,
+      devicesOnline: 1,
+      generatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const after = applyDashboardSocketEvent(
+      before,
+      AdminSocketEvents.USER_CREATED
+    );
+    expect(after.verifiedUsers).toBe(5);
+  });
 });

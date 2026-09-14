@@ -5,7 +5,7 @@ import {
   generateEmergencyKeyPair,
   signEmergencyCloud,
   fingerprintPublicKey,
-} from '../security/emergencyCanonical.js';
+} from '../../security/emergencyCanonical.js';
 
 export { generateEmergencyKeyPair, fingerprintPublicKey };
 

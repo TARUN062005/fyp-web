@@ -72,6 +72,7 @@ const run = async () => {
 
   const marker = `radar-gw-${Date.now()}`;
   await User.deleteMany({ googleAccountId: marker });
+  await User.deleteMany({ emergencyId: 'EDTN-RAD01' });
   const gateway = await User.create({
     googleAccountId: marker,
     emergencyId: 'EDTN-RAD01',

@@ -37,6 +37,23 @@ describe('radarGatewayStore', () => {
     resetRadarStore();
   });
 
+  it('does not list a gateway until a snapshot is published', () => {
+    assert.equal(listRadarGateways().length, 0);
+  });
+
+  it('keeps two publishers as distinct gateways so the admin can switch', () => {
+    const now = Date.now();
+    putRadarSnapshot(base({ gatewayUserId: 'gw-a', displayName: 'A' }), now);
+    putRadarSnapshot(
+      base({ gatewayUserId: 'gw-b', displayName: 'B', sequence: 2 }),
+      now
+    );
+    const list = listRadarGateways(now);
+    assert.equal(list.length, 2);
+    assert.equal(list.some((g) => g.gatewayUserId === 'gw-a'), true);
+    assert.equal(list.some((g) => g.gatewayUserId === 'gw-b'), true);
+  });
+
   it('stores a snapshot and lists the gateway as LIVE', () => {
     const now = Date.now();
     const result = putRadarSnapshot(base(), now);

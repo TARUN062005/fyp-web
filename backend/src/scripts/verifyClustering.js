@@ -15,6 +15,11 @@ import EmergencyReport from '../models/EmergencyReport.js';
 import EmergencyCluster from '../models/EmergencyCluster.js';
 import { issueTokenPair } from '../services/tokenService.js';
 import { CLUSTER_TIME_WINDOW_MS } from '../config/clustering.js';
+import {
+  buildSignedEmergencyUpload,
+  fingerprintPublicKey,
+  generateEmergencyKeyPair,
+} from '../tests/helpers/signedEmergencyUpload.js';
 
 const TYPE = 'other';
 const BASE_LNG = 77.5946;
@@ -24,14 +29,14 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-const ensureUser = async (marker, emergencyId) => {
+const ensureUser = async (marker, emergencyId, keyPair) => {
   await User.deleteMany({ googleAccountId: marker });
   return User.create({
     googleAccountId: marker,
     emergencyId,
     displayName: marker,
-    publicKey: `pk-${marker}`,
-    publicKeyFingerprint: `fp-${marker}`,
+    publicKey: keyPair.publicKeyBase64,
+    publicKeyFingerprint: fingerprintPublicKey(keyPair.publicKeyBase64),
     isVerified: true,
   });
 };
@@ -45,8 +50,17 @@ const upload = async (token, body) =>
 const run = async () => {
   await mongoose.connect(env.mongoUri);
 
-  const sender = await ensureUser('cluster-cov-sender', 'EDTN-CLCS1');
-  const uploader = await ensureUser('cluster-cov-uploader', 'EDTN-CLCU1');
+  const originKeys = generateEmergencyKeyPair();
+  const sender = await ensureUser(
+    'cluster-cov-sender',
+    'EDTN-CLCS1',
+    originKeys
+  );
+  const uploader = await ensureUser(
+    'cluster-cov-uploader',
+    'EDTN-CLCU1',
+    generateEmergencyKeyPair()
+  );
   const token = (await issueTokenPair(uploader._id)).accessToken;
   const prefix = `cluster-cov-${Date.now()}`;
   const now = Date.now();
@@ -67,18 +81,21 @@ const run = async () => {
   for (let i = 0; i < 3; i += 1) {
     const messageId = `${prefix}-near-${i}`;
     nearIds.push(messageId);
-    const res = await upload(token, {
-      messageId,
-      originalSenderId: String(sender._id),
-      uploaderId: String(uploader._id),
-      emergencyType: TYPE,
-      severity: 'MEDIUM',
-      location: {
-        type: 'Point',
-        coordinates: [BASE_LNG + i * 0.0003, BASE_LAT + i * 0.0002],
-      },
-      timestamp: new Date(now + i * 1000).toISOString(),
-    });
+    const res = await upload(
+      token,
+      buildSignedEmergencyUpload({
+        keyPair: originKeys,
+        messageId,
+        senderId: `mesh-${sender._id}`,
+        originalSenderId: String(sender._id),
+        uploaderId: String(uploader._id),
+        emergencyType: TYPE,
+        severity: 'MEDIUM',
+        longitude: BASE_LNG + i * 0.0003,
+        latitude: BASE_LAT + i * 0.0002,
+        timestampMs: now + i * 1000,
+      })
+    );
     assert(res.status === 201, `near upload ${i} => ${res.status}`);
   }
 
@@ -95,18 +112,21 @@ const run = async () => {
 
   // --- No merge: far outside radius (~5km) ---
   const farId = `${prefix}-far`;
-  const farRes = await upload(token, {
-    messageId: farId,
-    originalSenderId: String(sender._id),
-    uploaderId: String(uploader._id),
-    emergencyType: TYPE,
-    severity: 'MEDIUM',
-    location: {
-      type: 'Point',
-      coordinates: [BASE_LNG + 0.05, BASE_LAT + 0.05],
-    },
-    timestamp: new Date(now + 5000).toISOString(),
-  });
+  const farRes = await upload(
+    token,
+    buildSignedEmergencyUpload({
+      keyPair: originKeys,
+      messageId: farId,
+      senderId: `mesh-${sender._id}`,
+      originalSenderId: String(sender._id),
+      uploaderId: String(uploader._id),
+      emergencyType: TYPE,
+      severity: 'MEDIUM',
+      longitude: BASE_LNG + 0.05,
+      latitude: BASE_LAT + 0.05,
+      timestampMs: now + 5000,
+    })
+  );
   assert(farRes.status === 201, `far upload => ${farRes.status}`);
   const farReport = await EmergencyReport.findOne({ messageId: farId });
   assert(
@@ -128,18 +148,21 @@ const run = async () => {
   );
 
   const staleId = `${prefix}-stale-window`;
-  const staleRes = await upload(token, {
-    messageId: staleId,
-    originalSenderId: String(sender._id),
-    uploaderId: String(uploader._id),
-    emergencyType: TYPE,
-    severity: 'MEDIUM',
-    location: {
-      type: 'Point',
-      coordinates: [BASE_LNG, BASE_LAT],
-    },
-    timestamp: new Date(now + 8000).toISOString(),
-  });
+  const staleRes = await upload(
+    token,
+    buildSignedEmergencyUpload({
+      keyPair: originKeys,
+      messageId: staleId,
+      senderId: `mesh-${sender._id}`,
+      originalSenderId: String(sender._id),
+      uploaderId: String(uploader._id),
+      emergencyType: TYPE,
+      severity: 'MEDIUM',
+      longitude: BASE_LNG,
+      latitude: BASE_LAT,
+      timestampMs: now + 8000,
+    })
+  );
   assert(staleRes.status === 201, `stale-window upload => ${staleRes.status}`);
   const staleReport = await EmergencyReport.findOne({ messageId: staleId });
   assert(

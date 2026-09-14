@@ -11,6 +11,11 @@ import app from '../app.js';
 import User from '../models/User.js';
 import EmergencyReport from '../models/EmergencyReport.js';
 import { issueTokenPair } from '../services/tokenService.js';
+import {
+  buildSignedEmergencyUpload,
+  fingerprintPublicKey,
+  generateEmergencyKeyPair,
+} from '../tests/helpers/signedEmergencyUpload.js';
 
 const MESSAGE_ID = `msg-idempotency-${Date.now()}`;
 
@@ -18,14 +23,14 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-const ensureUser = async (marker, emergencyId) => {
+const ensureUser = async (marker, emergencyId, keyPair) => {
   await User.deleteMany({ googleAccountId: marker });
   return User.create({
     googleAccountId: marker,
     emergencyId,
     displayName: marker,
-    publicKey: `pk-${marker}`,
-    publicKeyFingerprint: `fp-${marker}`,
+    publicKey: keyPair.publicKeyBase64,
+    publicKeyFingerprint: fingerprintPublicKey(keyPair.publicKeyBase64),
     isVerified: true,
   });
 };
@@ -33,25 +38,37 @@ const ensureUser = async (marker, emergencyId) => {
 const run = async () => {
   await mongoose.connect(env.mongoUri);
 
-  const sender = await ensureUser('upload-idem-sender', 'EDTN-UIDS1');
-  const relayA = await ensureUser('upload-idem-relay-a', 'EDTN-UIDA1');
-  const relayB = await ensureUser('upload-idem-relay-b', 'EDTN-UIDB1');
+  const originKeys = generateEmergencyKeyPair();
+  const sender = await ensureUser('upload-idem-sender', 'EDTN-UIDS1', originKeys);
+  const relayA = await ensureUser(
+    'upload-idem-relay-a',
+    'EDTN-UIDA1',
+    generateEmergencyKeyPair()
+  );
+  const relayB = await ensureUser(
+    'upload-idem-relay-b',
+    'EDTN-UIDB1',
+    generateEmergencyKeyPair()
+  );
 
   await EmergencyReport.deleteMany({ messageId: MESSAGE_ID });
 
   const tokenA = (await issueTokenPair(relayA._id)).accessToken;
   const tokenB = (await issueTokenPair(relayB._id)).accessToken;
 
-  const bodyFor = (uploaderId, hopCount = 1) => ({
-    messageId: MESSAGE_ID,
-    originalSenderId: String(sender._id),
-    uploaderId: String(uploaderId),
-    emergencyType: 'flood',
-    severity: 'high',
-    location: { type: 'Point', coordinates: [77.5946, 12.9716] },
-    timestamp: new Date().toISOString(),
-    hopCount,
-  });
+  const bodyFor = (uploaderId, hopCount = 1) =>
+    buildSignedEmergencyUpload({
+      keyPair: originKeys,
+      messageId: MESSAGE_ID,
+      senderId: `mesh-${sender._id}`,
+      originalSenderId: String(sender._id),
+      uploaderId: String(uploaderId),
+      emergencyType: 'flood',
+      severity: 'HIGH',
+      longitude: 77.5946,
+      latitude: 12.9716,
+      hopCount,
+    });
 
   const first = await request(app)
     .post('/broadcast/upload')

@@ -20,6 +20,11 @@ import EmergencyReport from '../models/EmergencyReport.js';
 import { issueAdminTokenPair } from '../services/adminTokenService.js';
 import { issueTokenPair } from '../services/tokenService.js';
 import { AdminSocketEvents } from '../services/adminRealtime.js';
+import {
+  buildSignedEmergencyUpload,
+  fingerprintPublicKey,
+  generateEmergencyKeyPair,
+} from '../tests/helpers/signedEmergencyUpload.js';
 
 const ADMIN_EMAIL = 'dash-live-admin@dtnemergency.local';
 const TYPE = 'other';
@@ -78,12 +83,13 @@ const run = async () => {
 
   const marker = `dash-live-${Date.now()}`;
   await User.deleteMany({ googleAccountId: marker });
+  const originKeys = generateEmergencyKeyPair();
   const mobileUser = await User.create({
     googleAccountId: marker,
     emergencyId: 'EDTN-DLIVE',
     displayName: 'Dash Live Uploader',
-    publicKey: `pk-${marker}`,
-    publicKeyFingerprint: `fp-${marker}`,
+    publicKey: originKeys.publicKeyBase64,
+    publicKeyFingerprint: fingerprintPublicKey(originKeys.publicKeyBase64),
     isVerified: true,
   });
   const { accessToken: mobileAccess } = await issueTokenPair(mobileUser._id);
@@ -135,18 +141,19 @@ const run = async () => {
   const uploadRes = await request(app)
     .post('/broadcast/upload')
     .set('Authorization', `Bearer ${mobileAccess}`)
-    .send({
-      messageId,
-      originalSenderId: String(mobileUser._id),
-      uploaderId: String(mobileUser._id),
-      emergencyType: TYPE,
-      severity: 'HIGH',
-      location: {
-        type: 'Point',
-        coordinates: [78.4867, 17.385],
-      },
-      timestamp: new Date().toISOString(),
-    });
+    .send(
+      buildSignedEmergencyUpload({
+        keyPair: originKeys,
+        messageId,
+        senderId: `mesh-${mobileUser._id}`,
+        originalSenderId: String(mobileUser._id),
+        uploaderId: String(mobileUser._id),
+        emergencyType: TYPE,
+        severity: 'HIGH',
+        longitude: 78.4867,
+        latitude: 17.385,
+      })
+    );
   assert(uploadRes.status === 201, `upload => ${uploadRes.status}`);
   console.log(`[verify] uploaded ${messageId} => 201 ✓`);
 

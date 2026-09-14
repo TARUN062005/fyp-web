@@ -1,5 +1,6 @@
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
@@ -158,11 +159,7 @@ const useAdminSocketController = (enabled = true) => {
 
 export const AdminSocketProvider = ({ children }) => {
   const value = useAdminSocketController(true);
-  return (
-    <AdminSocketContext.Provider value={value}>
-      {children}
-    </AdminSocketContext.Provider>
-  );
+  return createElement(AdminSocketContext.Provider, { value }, children);
 };
 
 /** @deprecated Use AdminSocketProvider — kept for any remaining direct callers. */

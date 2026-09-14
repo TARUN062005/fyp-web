@@ -45,6 +45,12 @@ const statusPayload = (record) => ({
   angleKind: record.angleKind,
 });
 
+/**
+ * Live Radar snapshots. A mobile user becomes a gateway only while this
+ * process holds a recently published snapshot for their authenticated JWT
+ * user id. observerId spoofs are rejected. No durable gateway flag and no
+ * Mongo snapshot history — lastUpdatedAt drives LIVE / STALE / OFFLINE.
+ */
 export const publishRadarSnapshot = async (body, authenticatedUserId) => {
   if (body.observerId && String(body.observerId) !== String(authenticatedUserId)) {
     throw new AppError('observerId must match the authenticated gateway', 403);

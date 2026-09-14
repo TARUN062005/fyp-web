@@ -20,6 +20,11 @@ import { issueAdminTokenPair } from '../services/adminTokenService.js';
 import { issueTokenPair } from '../services/tokenService.js';
 import { AdminSocketEvents } from '../services/adminRealtime.js';
 import { severityRank } from '../services/clusteringService.js';
+import {
+  buildSignedEmergencyUpload,
+  fingerprintPublicKey,
+  generateEmergencyKeyPair,
+} from '../tests/helpers/signedEmergencyUpload.js';
 
 const ADMIN_EMAIL = 'map-sev-admin@dtnemergency.local';
 const TYPE = 'other';
@@ -88,12 +93,13 @@ const run = async () => {
 
   const marker = `map-sev-${Date.now()}`;
   await User.deleteMany({ googleAccountId: marker });
+  const originKeys = generateEmergencyKeyPair();
   const user = await User.create({
     googleAccountId: marker,
     emergencyId: 'EDTN-MAPSV',
     displayName: 'Map Severity Uploader',
-    publicKey: `pk-${marker}`,
-    publicKeyFingerprint: `fp-${marker}`,
+    publicKey: originKeys.publicKeyBase64,
+    publicKeyFingerprint: fingerprintPublicKey(originKeys.publicKeyBase64),
     isVerified: true,
   });
   const { accessToken: mobileAccess } = await issueTokenPair(user._id);
@@ -130,18 +136,20 @@ const run = async () => {
     request(app)
       .post('/broadcast/upload')
       .set('Authorization', `Bearer ${mobileAccess}`)
-      .send({
-        messageId: `${prefix}-${i}`,
-        originalSenderId: String(user._id),
-        uploaderId: String(user._id),
-        emergencyType: TYPE,
-        severity: 'LOW',
-        location: {
-          type: 'Point',
-          coordinates: [BASE_LNG + i * 0.0002, BASE_LAT],
-        },
-        timestamp: new Date(now + i * 1000).toISOString(),
-      });
+      .send(
+        buildSignedEmergencyUpload({
+          keyPair: originKeys,
+          messageId: `${prefix}-${i}`,
+          senderId: `mesh-${user._id}`,
+          originalSenderId: String(user._id),
+          uploaderId: String(user._id),
+          emergencyType: TYPE,
+          severity: 'LOW',
+          longitude: BASE_LNG + i * 0.0002,
+          latitude: BASE_LAT,
+          timestampMs: now + i * 1000,
+        })
+      );
 
   const createdP = waitFor(socket, AdminSocketEvents.CLUSTER_CREATED);
   const first = await upload(0);

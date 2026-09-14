@@ -68,6 +68,7 @@ const userSchema = new mongoose.Schema(
 // Unique indexes enforce one identity per Google account / emergencyId
 userSchema.index({ googleAccountId: 1 }, { unique: true, sparse: true });
 userSchema.index({ emergencyId: 1 }, { unique: true });
+userSchema.index({ publicKey: 1 });
 
 const User = mongoose.model('User', userSchema);
 

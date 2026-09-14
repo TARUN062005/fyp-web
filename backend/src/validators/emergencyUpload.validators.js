@@ -34,14 +34,27 @@ const emergencyTypeSchema = z.preprocess(
   })
 );
 
+const MAX_TTL_MS = 48 * 60 * 60 * 1000;
+
 export const emergencyUploadBodySchema = z.object({
   messageId: z.string().min(1).max(128),
-  originalSenderId: z.string().min(1),
+  originalSenderId: z.string().min(1).max(64).nullish(),
   uploaderId: z.string().min(1),
   emergencyType: emergencyTypeSchema,
   severity: severitySchema,
   location: geoPointSchema,
-  timestamp: z.union([z.string().datetime(), z.coerce.date()]),
+  timestamp: z.union([z.string().min(1), z.coerce.date()]),
   hopCount: z.coerce.number().int().min(0).max(5).optional().default(0),
-  senderPublicKey: z.string().min(1).max(512).nullish(),
+  senderId: z.string().min(1).max(128),
+  createdAtMs: z.coerce.number().int(),
+  ttl: z.coerce.number().int().positive().max(MAX_TTL_MS),
+  radiusCanonical: z.string().min(1).max(32),
+  latitudeCanonical: z.string().min(1).max(32),
+  longitudeCanonical: z.string().min(1).max(32),
+  batteryPercentage: z.preprocess(
+    (v) => (v === null || v === undefined || v === '' ? undefined : v),
+    z.number().int().min(0).max(100).optional()
+  ),
+  senderPublicKey: z.string().min(1).max(128),
+  signature: z.string().min(1).max(256),
 });

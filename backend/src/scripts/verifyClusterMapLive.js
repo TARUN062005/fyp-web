@@ -19,6 +19,11 @@ import EmergencyReport from '../models/EmergencyReport.js';
 import { issueAdminTokenPair } from '../services/adminTokenService.js';
 import { issueTokenPair } from '../services/tokenService.js';
 import { AdminSocketEvents } from '../services/adminRealtime.js';
+import {
+  buildSignedEmergencyUpload,
+  fingerprintPublicKey,
+  generateEmergencyKeyPair,
+} from '../tests/helpers/signedEmergencyUpload.js';
 
 const ADMIN_EMAIL = 'cluster-map-live@dtnemergency.local';
 const TYPE = 'other';
@@ -78,12 +83,13 @@ const run = async () => {
 
   const marker = `cl-map-${Date.now()}`;
   await User.deleteMany({ googleAccountId: marker });
+  const originKeys = generateEmergencyKeyPair();
   const user = await User.create({
     googleAccountId: marker,
     emergencyId: 'EDTN-CMLIV',
     displayName: 'Cluster Map Live',
-    publicKey: `pk-${marker}`,
-    publicKeyFingerprint: `fp-${marker}`,
+    publicKey: originKeys.publicKeyBase64,
+    publicKeyFingerprint: fingerprintPublicKey(originKeys.publicKeyBase64),
     isVerified: true,
   });
   const { accessToken: mobileAccess } = await issueTokenPair(user._id);
@@ -119,15 +125,19 @@ const run = async () => {
   const upload = await request(app)
     .post('/broadcast/upload')
     .set('Authorization', `Bearer ${mobileAccess}`)
-    .send({
-      messageId,
-      originalSenderId: String(user._id),
-      uploaderId: String(user._id),
-      emergencyType: TYPE,
-      severity: 'MEDIUM',
-      location: { type: 'Point', coordinates: [80.27, 13.08] },
-      timestamp: new Date().toISOString(),
-    });
+    .send(
+      buildSignedEmergencyUpload({
+        keyPair: originKeys,
+        messageId,
+        senderId: `mesh-${user._id}`,
+        originalSenderId: String(user._id),
+        uploaderId: String(user._id),
+        emergencyType: TYPE,
+        severity: 'MEDIUM',
+        longitude: 80.27,
+        latitude: 13.08,
+      })
+    );
   assert(upload.status === 201, `upload => ${upload.status}`);
   const created = await createdP;
   mapCache = applyClustersSocketEvent(

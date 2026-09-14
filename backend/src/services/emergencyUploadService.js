@@ -8,78 +8,116 @@ import {
   recomputeRelayCount,
   toEmergencyReportDto,
 } from './emergencyReportDto.js';
+import {
+  CryptoMaterialError,
+  canonicalEmergencyCloudBytes,
+  fingerprintPublicKey,
+  verifyEmergencyCloudSignature,
+} from '../security/emergencyCanonical.js';
 
-/** Reject reports older than this (Android emergency TTL / relay freshness). */
-const MAX_AGE_MS = Number(process.env.REPORT_TIMESTAMP_MAX_AGE_MS) || 48 * 60 * 60 * 1000;
 /** Allow limited future skew for device clock drift. */
 const FUTURE_SKEW_MS =
   Number(process.env.REPORT_TIMESTAMP_FUTURE_SKEW_MS) || 15 * 60 * 1000;
+/** Extra slack after signed TTL so DTN store-and-forward retries still land. */
+const TTL_SKEW_MS =
+  Number(process.env.REPORT_TTL_SKEW_MS) || 15 * 60 * 1000;
 const MAX_HOP_COUNT = 5;
+const COORD_EPSILON = 1e-7;
 
 const toReportDto = toEmergencyReportDto;
 
-const assertValidObjectId = (value, field) => {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    throw new AppError(`${field} must be a valid id`, 400);
-  }
+const fail = (message, statusCode, code) => {
+  const err = new AppError(message, statusCode);
+  err.code = code;
+  throw err;
 };
 
-const assertTimestampWindow = (timestamp) => {
-  const ts = new Date(timestamp);
-  if (Number.isNaN(ts.getTime())) {
-    throw new AppError('timestamp is invalid', 400);
+const assertValidObjectId = (value, field) => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    fail(`${field} must be a valid id`, 400, 'INVALID_ID');
   }
-
-  const now = Date.now();
-  const ageMs = now - ts.getTime();
-
-  if (ageMs > MAX_AGE_MS) {
-    throw new AppError(
-      `timestamp is too old (max age ${Math.round(MAX_AGE_MS / 3600000)}h)`,
-      400
-    );
-  }
-
-  if (ts.getTime() - now > FUTURE_SKEW_MS) {
-    throw new AppError(
-      `timestamp is too far in the future (max skew ${Math.round(FUTURE_SKEW_MS / 60000)}m)`,
-      400
-    );
-  }
-
-  return ts;
 };
 
 const normalizeHopCount = (hopCount) => {
   if (hopCount === undefined || hopCount === null) return 0;
   const n = Number(hopCount);
   if (!Number.isFinite(n) || n < 0) {
-    throw new AppError('hopCount must be a non-negative integer', 400);
+    fail('hopCount must be a non-negative integer', 400, 'INVALID_HOP');
   }
   return Math.floor(n);
 };
 
 const assertHopWithinLimit = (hopCount) => {
   if (hopCount > MAX_HOP_COUNT) {
-    throw new AppError(`hopCount exceeds max hop (${MAX_HOP_COUNT})`, 400);
+    fail(`hopCount exceeds max hop (${MAX_HOP_COUNT})`, 400, 'INVALID_HOP');
   }
   return hopCount;
 };
 
+const assertSignedCoordinates = (location, latitudeCanonical, longitudeCanonical) => {
+  const lat = Number(latitudeCanonical);
+  const lng = Number(longitudeCanonical);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    fail('signed coordinates are invalid', 400, 'INVALID_COORDINATES');
+  }
+  const [geoLng, geoLat] = location.coordinates;
+  if (
+    Math.abs(lat - geoLat) > COORD_EPSILON ||
+    Math.abs(lng - geoLng) > COORD_EPSILON
+  ) {
+    fail(
+      'location does not match signed coordinates',
+      400,
+      'LOCATION_MISMATCH'
+    );
+  }
+  return { latitude: lat, longitude: lng };
+};
+
+const assertTimestampMatchesCreatedAt = (timestamp, createdAtMs) => {
+  const ts = new Date(timestamp);
+  if (Number.isNaN(ts.getTime())) {
+    fail('timestamp is invalid', 400, 'INVALID_TIMESTAMP');
+  }
+  if (Math.abs(ts.getTime() - Number(createdAtMs)) > 1000) {
+    fail('timestamp does not match createdAtMs', 400, 'INVALID_TIMESTAMP');
+  }
+};
+
 /**
- * Merge a duplicate upload into an existing report (no second document).
+ * Authenticated TTL: createdAtMs + ttl come from verified canonical bytes.
+ * DTN expiry is timestamp+ttl; cloud allows TTL_SKEW_MS of clock drift.
  */
+const assertAuthenticatedTtl = (createdAtMs, ttl, now = Date.now()) => {
+  const created = Number(createdAtMs);
+  const ttlMs = Number(ttl);
+  if (!Number.isInteger(ttlMs) || ttlMs <= 0) {
+    fail('ttl must be a positive integer', 400, 'INVALID_TTL');
+  }
+  if (created - now > FUTURE_SKEW_MS) {
+    fail(
+      `timestamp is too far in the future (max skew ${Math.round(FUTURE_SKEW_MS / 60000)}m)`,
+      400,
+      'INVALID_TIMESTAMP'
+    );
+  }
+  if (now > created + ttlMs + TTL_SKEW_MS) {
+    fail('emergency has expired', 400, 'EMERGENCY_EXPIRED');
+  }
+  return new Date(created);
+};
+
 const assertSameOriginalSender = (existing, originalSenderId) => {
   if (String(existing.originalSenderId) !== String(originalSenderId)) {
-    throw new AppError(
+    fail(
       'messageId already bound to a different original sender',
-      409
+      409,
+      'PROVENANCE_MISMATCH'
     );
   }
 };
 
 const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
-  const uploaderOid = new mongoose.Types.ObjectId(String(uploaderId));
   const uploaderSet = new Set(
     (existing.uploaders || []).map((id) => String(id))
   );
@@ -103,7 +141,6 @@ const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
   if (!existing.firstUploadedAt) {
     existing.firstUploadedAt = existing.createdAt || now;
   }
-  // Keep first uploaderId as historical first uploader
   await existing.save();
 
   emitToAdmin(AdminSocketEvents.REPORT_UPDATED, {
@@ -117,49 +154,120 @@ const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
   };
 };
 
+const resolveOriginUser = async (senderPublicKey, claimedOriginalSenderId) => {
+  const key = String(senderPublicKey).trim();
+  const fingerprint = fingerprintPublicKey(key);
+  const originUser = await User.findOne({
+    $or: [{ publicKey: key }, { publicKeyFingerprint: fingerprint }],
+  });
+  if (!originUser) {
+    fail(
+      'original sender is not a registered backend identity',
+      422,
+      'ORIGIN_NOT_REGISTERED'
+    );
+  }
+  if (String(originUser.publicKey || '').trim() !== key) {
+    fail(
+      'senderPublicKey does not match original sender identity',
+      403,
+      'PROVENANCE_MISMATCH'
+    );
+  }
+  if (claimedOriginalSenderId) {
+    assertValidObjectId(claimedOriginalSenderId, 'originalSenderId');
+    if (String(originUser._id) !== String(claimedOriginalSenderId)) {
+      fail(
+        'originalSenderId does not match verified signing identity',
+        403,
+        'PROVENANCE_MISMATCH'
+      );
+    }
+  }
+  return originUser;
+};
+
 /**
  * Offline→online relay upload.
  *
- * Replay / duplicate protection:
- * 1. messageId uniqueness — lookup + unique index; duplicates merge counters
- *    (uploaders, uploadCount, relayCount, hopCount) — never a second document.
- * 2. timestamp window — reject if older than REPORT_TIMESTAMP_MAX_AGE_MS
- *    (default 48h) or more than REPORT_TIMESTAMP_FUTURE_SKEW_MS ahead
- *    (default 15m). Applied on create only.
+ * Validation order:
+ * 1. Relay JWT (middleware) — uploaderId is always the authenticated user
+ * 2. Request schema (middleware)
+ * 3. Reconstruct metadata canonical + verify Ed25519
+ * 4. Authenticated createdAtMs / TTL
+ * 5. Derive original sender from verified public key (never trust unsigned ids)
+ * 6. messageId uniqueness + unique index race handling
+ * 7. Persist exactly one EmergencyReport; uploaderId stays distinct from origin
+ *
+ * Origin with no backend user: 422 ORIGIN_NOT_REGISTERED (explicit; not dropped).
  */
 export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
   const {
     messageId,
-    originalSenderId,
-    uploaderId,
+    originalSenderId: claimedOriginalSenderId,
+    uploaderId: claimedUploaderId,
     emergencyType,
     severity,
     location,
     timestamp,
     hopCount: rawHopCount,
+    senderId,
+    createdAtMs,
+    ttl,
+    radiusCanonical,
+    latitudeCanonical,
+    longitudeCanonical,
+    batteryPercentage,
     senderPublicKey,
+    signature,
   } = payload;
 
-  assertValidObjectId(originalSenderId, 'originalSenderId');
+  const uploaderId = String(authenticatedUserId);
   assertValidObjectId(uploaderId, 'uploaderId');
-
-  if (String(uploaderId) !== String(authenticatedUserId)) {
-    throw new AppError('uploaderId must match the authenticated user', 403);
+  if (String(claimedUploaderId) !== uploaderId) {
+    fail('uploaderId must match the authenticated user', 403, 'UPLOADER_MISMATCH');
   }
 
   const hopCount = normalizeHopCount(rawHopCount);
+  assertSignedCoordinates(location, latitudeCanonical, longitudeCanonical);
+  assertTimestampMatchesCreatedAt(timestamp, createdAtMs);
 
-  const originUser = await User.findById(originalSenderId);
-  if (!originUser) {
-    throw new AppError('original sender is unknown', 400);
+  let canonicalBytes;
+  let signatureOk;
+  try {
+    canonicalBytes = canonicalEmergencyCloudBytes({
+      messageId,
+      senderId,
+      createdAtMs,
+      ttl,
+      radiusCanonical,
+      severity,
+      emergencyType,
+      latitudeCanonical,
+      longitudeCanonical,
+      batteryPercentage,
+      senderPublicKey,
+    });
+    signatureOk = verifyEmergencyCloudSignature({
+      canonicalBytes,
+      signature,
+      senderPublicKey,
+    });
+  } catch (err) {
+    if (err instanceof CryptoMaterialError) {
+      fail(err.message, 400, 'MALFORMED_CRYPTO');
+    }
+    fail('emergency signature is invalid', 400, 'INVALID_SIGNATURE');
   }
-  if (
-    senderPublicKey &&
-    originUser.publicKey &&
-    String(originUser.publicKey).trim() !== String(senderPublicKey).trim()
-  ) {
-    throw new AppError('senderPublicKey does not match original sender identity', 403);
+  if (!signatureOk) {
+    fail('emergency signature is invalid', 400, 'INVALID_SIGNATURE');
   }
+
+  const originUser = await resolveOriginUser(
+    senderPublicKey,
+    claimedOriginalSenderId
+  );
+  const originalSenderId = String(originUser._id);
 
   const existing = await EmergencyReport.findOne({ messageId });
   if (existing) {
@@ -172,11 +280,10 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
   }
 
   assertHopWithinLimit(hopCount);
-
-  const normalizedTimestamp = assertTimestampWindow(timestamp);
+  const normalizedTimestamp = assertAuthenticatedTtl(createdAtMs, ttl);
   const now = new Date();
-  const uploaderOid = new mongoose.Types.ObjectId(String(uploaderId));
-  const originOid = new mongoose.Types.ObjectId(String(originalSenderId));
+  const uploaderOid = new mongoose.Types.ObjectId(uploaderId);
+  const originOid = new mongoose.Types.ObjectId(originalSenderId);
   const uploaders = [uploaderOid];
   const relayCount = recomputeRelayCount(uploaders, originalSenderId);
 
@@ -200,12 +307,14 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
       verificationStatus: 'UNVERIFIED',
       emergencyType,
       severity,
-      location,
+      location: {
+        type: 'Point',
+        coordinates: [Number(longitudeCanonical), Number(latitudeCanonical)],
+      },
       timestamp: normalizedTimestamp,
       clusterId: null,
     });
   } catch (err) {
-    // Race: another relay inserted the same messageId first
     if (err?.code === 11000 && err?.keyPattern?.messageId) {
       const raced = await EmergencyReport.findOne({ messageId });
       if (raced) {
@@ -225,7 +334,6 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
   });
 
   await enqueueForClustering(report);
-  // Reload so response includes the assigned clusterId
   const linked = await EmergencyReport.findById(report._id);
 
   return {

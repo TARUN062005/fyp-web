@@ -16,6 +16,8 @@
     "verify:cert-reissue": "node src/scripts/verifyCertificateReissue.js",
     "verify:rate-limit": "node src/scripts/verifyRateLimit.js",
     "verify:upload-idempotency": "node src/scripts/verifyUploadIdempotency.js",
+    "verify:emergency-crypto": "node src/scripts/verifyEmergencyUploadCrypto.js",
+    "test:unit": "node --test src/tests/*.test.js",
     "verify:clustering": "node src/scripts/verifyClustering.js",
     "verify:admin-audit": "node src/scripts/verifyAdminAuditLogs.js",
     "verify:admin-socket": "node src/scripts/verifyAdminSocket.js",

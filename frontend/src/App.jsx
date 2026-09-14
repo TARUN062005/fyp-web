@@ -8,6 +8,7 @@ import ClustersPage from './pages/ClustersPage.jsx';
 import ClusterDetailPage from './pages/ClusterDetailPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
+import LiveRadarPage from './pages/LiveRadarPage.jsx';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/clusters/:clusterId" element={<ClusterDetailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/live-radar" element={<LiveRadarPage />} />
         </Route>
       </Route>
 

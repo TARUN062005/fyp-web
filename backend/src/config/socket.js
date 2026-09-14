@@ -1,8 +1,15 @@
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
 import env from './env.js';
 import { verifyAdminToken, verifyToken } from '../utils/jwt.js';
 import AdminUser from '../models/AdminUser.js';
 import User from '../models/User.js';
+import {
+  AdminSocketEvents,
+  radarRoomName,
+} from '../services/adminRealtime.js';
+import { getRadarGateway } from '../services/radarGatewayStore.js';
+import { startRadarFreshnessMonitor } from '../services/radarService.js';
 
 let io = null;
 let adminNamespace = null;
@@ -79,12 +86,56 @@ export const initSocket = (httpServer) => {
       `[socket:/admin] Connected ${socket.id} admin=${socket.admin.adminId}`
     );
 
+    const leaveRadarRooms = () => {
+      for (const room of socket.rooms) {
+        if (String(room).startsWith('radar:')) {
+          socket.leave(room);
+        }
+      }
+    };
+
+    socket.on('radar:subscribe', (payload = {}) => {
+      const gatewayUserId = String(payload.gatewayUserId || '').trim();
+      if (!mongoose.Types.ObjectId.isValid(gatewayUserId)) {
+        socket.emit('radar:error', { message: 'invalid gatewayUserId' });
+        return;
+      }
+      leaveRadarRooms();
+      socket.join(radarRoomName(gatewayUserId));
+      const current = getRadarGateway(gatewayUserId);
+      if (current) {
+        socket.emit(AdminSocketEvents.RADAR_GATEWAY_UPDATED, {
+          ...current,
+          emittedAt: new Date().toISOString(),
+        });
+      } else {
+        socket.emit(AdminSocketEvents.RADAR_GATEWAY_STATUS, {
+          gatewayUserId,
+          status: 'OFFLINE',
+          lastUpdatedAt: null,
+          peerCount: 0,
+          emittedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    socket.on('radar:unsubscribe', (payload = {}) => {
+      const gatewayUserId = String(payload.gatewayUserId || '').trim();
+      if (gatewayUserId) {
+        socket.leave(radarRoomName(gatewayUserId));
+      } else {
+        leaveRadarRooms();
+      }
+    });
+
     socket.on('disconnect', (reason) => {
       console.log(
         `[socket:/admin] Disconnected ${socket.id} reason=${reason}`
       );
     });
   });
+
+  startRadarFreshnessMonitor();
 
   mobileNamespace = io.of('/mobile');
 

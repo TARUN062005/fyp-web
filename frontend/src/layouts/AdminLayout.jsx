@@ -1,20 +1,20 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore.js';
 import { logoutAdmin } from '../services/authService.js';
-import { useAdminSocket } from '../hooks/useAdminSocket.js';
+import { AdminSocketProvider } from '../hooks/useAdminSocket.js';
 
-const navItems = [
+export const adminNavItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/map', label: 'Map' },
   { to: '/clusters', label: 'Clusters' },
   { to: '/users', label: 'Users' },
   { to: '/reports', label: 'Reports' },
+  { to: '/live-radar', label: 'Live Radar' },
 ];
 
-const AdminLayout = () => {
+const AdminLayoutChrome = () => {
   const navigate = useNavigate();
   const admin = useAuthStore((s) => s.admin);
-  useAdminSocket(true);
 
   const handleLogout = async () => {
     try {
@@ -45,7 +45,7 @@ const AdminLayout = () => {
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 p-2" aria-label="Primary">
-          {navItems.map((item) => (
+          {adminNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -90,5 +90,11 @@ const AdminLayout = () => {
     </div>
   );
 };
+
+const AdminLayout = () => (
+  <AdminSocketProvider>
+    <AdminLayoutChrome />
+  </AdminSocketProvider>
+);
 
 export default AdminLayout;

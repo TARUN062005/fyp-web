@@ -13,6 +13,21 @@ export const AdminSocketEvents = {
   USER_BLOCKED: 'user:blocked',
   USER_UNBLOCKED: 'user:unblocked',
   USER_CREATED: 'user:created',
+  RADAR_GATEWAY_UPDATED: 'radar:gateway:updated',
+  RADAR_GATEWAY_STATUS: 'radar:gateway:status',
+};
+
+export const radarRoomName = (gatewayUserId) => `radar:${gatewayUserId}`;
+
+/** Snapshot payload — only sockets that subscribed to this gateway. */
+export const emitToRadarRoom = (gatewayUserId, event, payload) => {
+  const nsp = getAdminNamespace();
+  if (!nsp) return false;
+  nsp.to(radarRoomName(gatewayUserId)).emit(event, {
+    ...payload,
+    emittedAt: new Date().toISOString(),
+  });
+  return true;
 };
 
 /**

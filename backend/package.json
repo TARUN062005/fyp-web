@@ -19,6 +19,7 @@
     "verify:clustering": "node src/scripts/verifyClustering.js",
     "verify:admin-audit": "node src/scripts/verifyAdminAuditLogs.js",
     "verify:admin-socket": "node src/scripts/verifyAdminSocket.js",
+    "verify:radar-snapshot": "node src/scripts/verifyRadarSnapshot.js",
     "verify:dashboard-live": "node src/scripts/verifyDashboardLive.js",
     "verify:map-severity-live": "node src/scripts/verifyMapSeverityLive.js",
     "verify:cluster-map-live": "node src/scripts/verifyClusterMapLive.js",

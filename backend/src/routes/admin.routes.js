@@ -18,6 +18,10 @@ import {
   getDashboardSummary,
   getAnalytics,
 } from '../controllers/adminOps.controller.js';
+import {
+  getRadarGateways,
+  getRadarGatewayById,
+} from '../controllers/radar.controller.js';
 import { authenticateAdmin } from '../middleware/authenticateAdmin.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { auditLog } from '../middleware/auditLog.js';
@@ -38,6 +42,7 @@ import {
   usersQuerySchema,
   analyticsQuerySchema,
 } from '../validators/adminOps.validators.js';
+import { radarGatewayIdParamsSchema } from '../validators/radar.validators.js';
 
 const router = Router();
 
@@ -149,6 +154,15 @@ router.get(
   ...adminGuard,
   validateRequest({ query: analyticsQuerySchema }),
   getAnalytics
+);
+
+router.get('/radar/gateways', ...adminGuard, getRadarGateways);
+
+router.get(
+  '/radar/gateways/:userId',
+  ...adminGuard,
+  validateRequest({ params: radarGatewayIdParamsSchema }),
+  getRadarGatewayById
 );
 
 export default router;

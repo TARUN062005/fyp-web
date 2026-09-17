@@ -43,6 +43,7 @@ const run = async () => {
     'Install 1 missing IdentityCertificate from B4b'
   );
   assert(created.accessToken && created.refreshToken, 'Install 1 missing JWT pair');
+  assert(created.userId, 'Install 1 missing Mongo userId on session');
 
   const emergencyId1 = created.profile.emergencyId;
   console.log(`[verify] Install 1 emergencyId = ${emergencyId1}`);

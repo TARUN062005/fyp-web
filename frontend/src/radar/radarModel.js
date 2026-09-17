@@ -43,6 +43,8 @@ export const mergeGatewayList = (gateways, statusPayload) => {
     sequence: statusPayload.sequence ?? list[idx]?.sequence ?? 0,
     peerCount: statusPayload.peerCount ?? list[idx]?.peerCount ?? 0,
     angleKind: statusPayload.angleKind || list[idx]?.angleKind || 'VISUAL_SECTOR',
+    observerLocation:
+      statusPayload.observerLocation ?? list[idx]?.observerLocation ?? null,
   };
   if (idx === -1) {
     list.push(next);

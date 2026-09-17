@@ -67,6 +67,35 @@ describe('radarGatewayStore', () => {
     assert.equal(full.peers[0].displayName, 'Person A');
   });
 
+  it('stores observer GeoJSON so admin Live Radar can plot a real map', () => {
+    const now = Date.now();
+    putRadarSnapshot(
+      base({
+        observerLocation: { type: 'Point', coordinates: [79.8612, 6.9271] },
+        observerAccuracyMeters: 6.4,
+        peers: [
+          {
+            peerId: 'peer-a',
+            displayName: 'Person A',
+            connectionState: 'CONNECTED',
+            distanceMeters: 18.4,
+            beyondRadarRange: false,
+            angleDegrees: 12,
+            location: { type: 'Point', coordinates: [79.8614, 6.9273] },
+            locationSource: 'GPS',
+          },
+        ],
+      }),
+      now
+    );
+    const full = getRadarGateway(base().gatewayUserId, now);
+    assert.deepEqual(full.observerLocation.coordinates, [79.8612, 6.9271]);
+    assert.equal(full.observerAccuracyMeters, 6.4);
+    assert.deepEqual(full.peers[0].location.coordinates, [79.8614, 6.9273]);
+    const list = listRadarGateways(now);
+    assert.deepEqual(list[0].observerLocation.coordinates, [79.8612, 6.9271]);
+  });
+
   it('merges same sequence as duplicate without a second logical gateway', () => {
     const now = Date.now();
     putRadarSnapshot(base({ sequence: 4 }), now);

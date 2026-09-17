@@ -23,6 +23,17 @@ const toIso = (value) => {
   return d.toISOString();
 };
 
+const sanitizeGeoPoint = (point) => {
+  if (!point || !Array.isArray(point.coordinates) || point.coordinates.length < 2) {
+    return null;
+  }
+  const lng = Number(point.coordinates[0]);
+  const lat = Number(point.coordinates[1]);
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return null;
+  return { type: 'Point', coordinates: [lng, lat] };
+};
+
 const sanitizePeer = (peer) => ({
   peerId: String(peer.peerId),
   emergencyId: peer.emergencyId ? String(peer.emergencyId) : null,
@@ -32,6 +43,10 @@ const sanitizePeer = (peer) => ({
   beyondRadarRange: Boolean(peer.beyondRadarRange),
   angleDegrees: Number(peer.angleDegrees),
   lastSeen: peer.lastSeen ? toIso(peer.lastSeen) : null,
+  location: sanitizeGeoPoint(peer.location),
+  locationSource: peer.locationSource === 'GPS' || peer.locationSource === 'ESTIMATED'
+    ? peer.locationSource
+    : null,
 });
 
 const statusPayload = (record) => ({
@@ -43,6 +58,7 @@ const statusPayload = (record) => ({
   sequence: record.sequence,
   peerCount: record.peerCount,
   angleKind: record.angleKind,
+  observerLocation: record.observerLocation || null,
 });
 
 /**
@@ -79,6 +95,10 @@ export const publishRadarSnapshot = async (body, authenticatedUserId) => {
   }
 
   const peers = (body.peers || []).map(sanitizePeer);
+  const observerLocation = sanitizeGeoPoint(body.observerLocation);
+  const observerAccuracyMeters = Number.isFinite(Number(body.observerAccuracyMeters))
+    ? Number(body.observerAccuracyMeters)
+    : null;
   const result = putRadarSnapshot({
     gatewayUserId: String(authenticatedUserId),
     displayName: user.displayName,
@@ -88,6 +108,8 @@ export const publishRadarSnapshot = async (body, authenticatedUserId) => {
     radarRangeMeters: body.radarRangeMeters,
     angleKind: body.angleKind || 'VISUAL_SECTOR',
     peers,
+    observerLocation,
+    observerAccuracyMeters,
   });
 
   if (!result.ok) {

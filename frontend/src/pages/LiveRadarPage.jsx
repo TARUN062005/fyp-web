@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ErrorAlert, LoadingNotice } from '../components/ui/AdminState.jsx';
-import GatewayRadarCanvas from '../components/radar/GatewayRadarCanvas.jsx';
+import GatewayRadarMap from '../components/radar/GatewayRadarMap.jsx';
 import { useAdminSocketApi } from '../hooks/useAdminSocket.js';
 import {
   formatAge,
@@ -10,6 +10,7 @@ import {
   RadarSocketEvents,
   shouldApplyRadarUpdate,
 } from '../radar/radarModel.js';
+import { formatCoord, resolveGatewayLatLng, resolvePeerLatLng, toLatLng } from '../radar/radarGeo.js';
 import {
   fetchRadarGateway,
   fetchRadarGateways,
@@ -112,6 +113,10 @@ const LiveRadarPage = () => {
     gatewayStatusFromAge(lastUpdatedAt, now);
   const peers = snapshot?.peers || [];
   const selectedPeer = peers.find((p) => p.peerId === selectedPeerId) || null;
+  const gatewayLatLng = resolveGatewayLatLng(snapshot);
+  const selectedPeerMap = selectedPeer
+    ? resolvePeerLatLng(selectedPeer, gatewayLatLng)
+    : null;
   const stale = liveStatus !== 'LIVE';
 
   const selectGateway = (id) => {
@@ -129,9 +134,9 @@ const LiveRadarPage = () => {
         <div>
           <h2 className="admin-page-title">Live Radar</h2>
           <p className="admin-page-sub">
-            Gateway perspective from the selected Internet-connected Android
-            node. Distances are RSSI estimates; direction is a visual sector,
-            not a compass bearing.
+            Internet-connected Android gateways are placed on the real map at
+            their live GPS. Nearby mesh nodes use SOS/GPS when known, otherwise
+            RSSI distance around the gateway.
           </p>
         </div>
         <p className="font-mono text-[11px] text-admin-muted">
@@ -188,6 +193,11 @@ const LiveRadarPage = () => {
                       >
                         {status}
                       </span>
+                      {g.observerLocation ? (
+                        <span className="ml-2 font-mono text-[10px] text-admin-muted">
+                          GPS
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 );
@@ -199,7 +209,7 @@ const LiveRadarPage = () => {
         <div className="border border-admin-line bg-admin-panel p-3 shadow-admin">
           {!selectedId ? (
             <p className="text-sm text-admin-muted">
-              Select an Internet-connected gateway to view its radar.
+              Select an Internet-connected gateway to place them on the map.
             </p>
           ) : (
             <>
@@ -223,18 +233,54 @@ const LiveRadarPage = () => {
                   <p className="font-mono text-[11px] text-admin-muted">
                     Last update: {formatAge(lastUpdatedAt, now)}
                   </p>
+                  {gatewayLatLng ? (
+                    <p className="font-mono text-[11px] text-admin-muted">
+                      {formatCoord(gatewayLatLng)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="mt-3 flex justify-center bg-[#0f1720]">
-                <GatewayRadarCanvas
-                  peers={peers}
-                  radarRangeMeters={snapshot?.radarRangeMeters || 20}
+              <div className="mt-3">
+                <GatewayRadarMap
+                  key={selectedId}
+                  snapshot={snapshot}
                   selectedPeerId={selectedPeerId}
                   onSelectPeer={(peer) => setSelectedPeerId(peer.peerId)}
                   stale={stale}
                 />
               </div>
+
+              {peers.length > 0 ? (
+                <ul className="mt-3 divide-y divide-admin-line border border-admin-line">
+                  {peers.map((peer) => {
+                    const gps = toLatLng(peer.location);
+                    return (
+                      <li key={peer.peerId}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPeerId(peer.peerId)}
+                          className={[
+                            'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                            selectedPeerId === peer.peerId
+                              ? 'bg-admin-accent-soft'
+                              : 'hover:bg-admin-surface',
+                          ].join(' ')}
+                        >
+                          <span className="font-medium">{peer.displayName}</span>
+                          <span className="font-mono text-[11px] text-admin-muted">
+                            {peer.connectionState.toLowerCase()} ·{' '}
+                            {peer.beyondRadarRange
+                              ? `>${snapshot?.radarRangeMeters || 20} m`
+                              : `${Number(peer.distanceMeters).toFixed(1)} m`}
+                            {gps ? ` · ${formatCoord(gps)}` : ''}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
 
               {selectedPeer ? (
                 <div className="mt-3 border border-admin-line bg-admin-surface p-3 text-sm">
@@ -273,6 +319,19 @@ const LiveRadarPage = () => {
                       <dt className="text-xs text-admin-muted">Status</dt>
                       <dd>{selectedPeer.connectionState}</dd>
                     </div>
+                    {selectedPeerMap ? (
+                      <div>
+                        <dt className="text-xs text-admin-muted">
+                          Map coordinates
+                        </dt>
+                        <dd className="font-mono">
+                          {formatCoord(selectedPeerMap.position)}
+                          {selectedPeerMap.source === 'ESTIMATED'
+                            ? ' (estimated)'
+                            : ' (GPS)'}
+                        </dd>
+                      </div>
+                    ) : null}
                     {selectedPeer.emergencyId ? (
                       <div>
                         <dt className="text-xs text-admin-muted">Emergency ID</dt>
@@ -289,8 +348,8 @@ const LiveRadarPage = () => {
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-admin-muted">
-                  {peers.length} nearby node{peers.length === 1 ? '' : 's'}. Click a
-                  node for details.
+                  {peers.length} nearby node{peers.length === 1 ? '' : 's'} on the
+                  map. Click a marker or row for details.
                 </p>
               )}
             </>

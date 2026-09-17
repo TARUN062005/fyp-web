@@ -30,6 +30,22 @@ vi.mock('../hooks/useAdminSocket.js', () => ({
   useAdminSocket: () => {},
 }));
 
+vi.mock('../components/radar/GatewayRadarMap.jsx', () => ({
+  default: ({ snapshot, onSelectPeer }) => (
+    <div data-testid="gateway-radar-map">
+      {(snapshot?.peers || []).map((peer) => (
+        <button
+          key={peer.peerId}
+          type="button"
+          onClick={() => onSelectPeer?.(peer)}
+        >
+          map:{peer.displayName}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('../services/radarService.js', () => ({
   radarGatewaysQueryKey: ['admin', 'radar', 'gateways'],
   radarGatewayQueryKey: (id) => ['admin', 'radar', 'gateway', id],
@@ -123,7 +139,7 @@ describe('Live Radar', () => {
     expect(await screen.findByText('Person A')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Person A'));
     expect(screen.getByText('Selected node')).toBeInTheDocument();
-    expect(screen.getByText(/18.4 m/)).toBeInTheDocument();
+    expect(screen.getAllByText(/18\.4 m/).length).toBeGreaterThan(0);
   });
 
   it('applies a socket snapshot for the selected gateway only', async () => {

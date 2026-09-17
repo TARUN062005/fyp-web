@@ -93,6 +93,7 @@ const completeSession = async (user) => {
   return {
     status: 'authenticated',
     ...tokens,
+    userId: String(user._id),
     profile: toPublicProfile(user),
   };
 };

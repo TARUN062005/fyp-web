@@ -42,6 +42,8 @@ const snapshotBody = (sequence = 1) => ({
   sequence,
   radarRangeMeters: 20,
   angleKind: 'VISUAL_SECTOR',
+  observerLocation: { type: 'Point', coordinates: [79.8612, 6.9271] },
+  observerAccuracyMeters: 6.5,
   peers: [
     {
       peerId: 'peer-a',
@@ -51,6 +53,8 @@ const snapshotBody = (sequence = 1) => ({
       distanceMeters: 18.4,
       beyondRadarRange: false,
       angleDegrees: 12.5,
+      location: { type: 'Point', coordinates: [79.8614, 6.9273] },
+      locationSource: 'GPS',
     },
   ],
 });
@@ -167,6 +171,11 @@ const run = async () => {
   const snap = await pending;
   assert(snap.gatewayUserId === String(gateway._id), 'subscribe snapshot gateway mismatch');
   assert(snap.peers[0].displayName === 'Person A', 'peer name missing');
+  assert(
+    Array.isArray(snap.observerLocation?.coordinates) &&
+      snap.observerLocation.coordinates[0] === 79.8612,
+    'observer GPS missing on snapshot'
+  );
   console.log('[verify] radar:subscribe delivered current snapshot ✓');
 
   const nextPending = waitForEvent(socket, AdminSocketEvents.RADAR_GATEWAY_UPDATED);

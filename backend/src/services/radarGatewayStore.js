@@ -40,6 +40,10 @@ const toPublicRecord = (record, now = Date.now()) => {
     angleKind: record.angleKind,
     peerCount: Array.isArray(record.peers) ? record.peers.length : 0,
     peers: record.peers,
+    observerLocation: record.observerLocation || null,
+    observerAccuracyMeters: Number.isFinite(record.observerAccuracyMeters)
+      ? record.observerAccuracyMeters
+      : null,
     previousStatus: record.previousStatus || status,
   };
 };
@@ -62,6 +66,7 @@ export const listRadarGateways = (now = Date.now()) => {
       sequence: pub.sequence,
       peerCount: pub.peerCount,
       angleKind: pub.angleKind,
+      observerLocation: pub.observerLocation,
     });
   }
   const rank = { LIVE: 0, STALE: 1, OFFLINE: 2 };
@@ -96,6 +101,8 @@ export const putRadarSnapshot = (
     radarRangeMeters,
     angleKind,
     peers,
+    observerLocation,
+    observerAccuracyMeters,
   },
   now = Date.now()
 ) => {
@@ -131,6 +138,10 @@ export const putRadarSnapshot = (
     radarRangeMeters: Number(radarRangeMeters) || 20,
     angleKind: angleKind || 'VISUAL_SECTOR',
     peers: Array.isArray(peers) ? peers : [],
+    observerLocation: observerLocation || null,
+    observerAccuracyMeters: Number.isFinite(Number(observerAccuracyMeters))
+      ? Number(observerAccuracyMeters)
+      : null,
     lastUpdatedAt: now,
     previousStatus: previousStatus || 'LIVE',
   };

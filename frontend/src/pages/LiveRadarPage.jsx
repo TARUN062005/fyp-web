@@ -134,9 +134,9 @@ const LiveRadarPage = () => {
         <div>
           <h2 className="admin-page-title">Live Radar</h2>
           <p className="admin-page-sub">
-            Internet-connected Android gateways are placed on the real map at
-            their live GPS. Nearby mesh nodes use SOS/GPS when known, otherwise
-            RSSI distance around the gateway.
+            Real OpenStreetMap view of the selected phone. The gateway is
+            placed at live GPS (or last SOS location); nearby nodes use GPS
+            when known, otherwise RSSI distance.
           </p>
         </div>
         <p className="font-mono text-[11px] text-admin-muted">

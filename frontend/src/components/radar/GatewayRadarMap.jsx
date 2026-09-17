@@ -18,32 +18,24 @@ import {
 } from '../../radar/radarGeo.js';
 
 const DEFAULT_CENTER = [20.5937, 78.9629];
+const DEFAULT_ZOOM = 5;
 const PRECISE_ZOOM = 18;
 
 const FollowGateway = ({ position, follow }) => {
   const map = useMap();
   const last = useRef(null);
-  const gatewayKey = useRef(null);
 
   useEffect(() => {
     if (!position || !follow) return undefined;
-    const key = `${position[0].toFixed(6)},${position[1].toFixed(6)}`;
-    if (gatewayKey.current !== key && !last.current) {
+    if (!last.current) {
       map.setView(position, PRECISE_ZOOM, { animate: true });
       last.current = position;
-      gatewayKey.current = key;
-      return undefined;
-    }
-    if (!last.current) {
-      last.current = position;
-      gatewayKey.current = key;
       return undefined;
     }
     const moved = map.distance(last.current, position);
     if (moved >= 3) {
       map.panTo(position, { animate: true, duration: 0.75 });
       last.current = position;
-      gatewayKey.current = key;
     }
     return undefined;
   }, [follow, map, position]);
@@ -72,7 +64,6 @@ const GatewayRadarMap = ({
   const accuracy = Number(snapshot?.observerAccuracyMeters);
 
   const plotted = useMemo(() => {
-    if (!gateway) return [];
     return (snapshot?.peers || [])
       .map((peer) => {
         const resolved = resolvePeerLatLng(peer, gateway);
@@ -86,21 +77,13 @@ const GatewayRadarMap = ({
     setFollow(true);
   };
 
-  if (!gateway) {
-    return (
-      <div className="flex h-[min(70vh,640px)] items-center justify-center bg-[#0f1720] px-6 text-center text-sm text-slate-300">
-        Waiting for this gateway’s live GPS. Keep the Android app open with
-        location permission so the website can place the user on the map.
-      </div>
-    );
-  }
-
   return (
-    <div className="relative h-[min(70vh,640px)] w-full overflow-hidden bg-[#0f1720]">
+    <div className="relative h-[min(70vh,640px)] min-h-[420px] w-full overflow-hidden bg-[#e8eef2]">
       <MapContainer
-        center={gateway}
-        zoom={PRECISE_ZOOM}
+        center={gateway || DEFAULT_CENTER}
+        zoom={gateway ? PRECISE_ZOOM : DEFAULT_ZOOM}
         className="h-full w-full"
+        style={{ height: '100%', width: '100%' }}
         scrollWheelZoom
         preferCanvas
       >
@@ -111,18 +94,20 @@ const GatewayRadarMap = ({
         <FollowGateway position={gateway} follow={follow} />
         <MapGestures onUserPan={() => setFollow(false)} />
 
-        <Circle
-          center={gateway}
-          radius={range}
-          pathOptions={{
-            color: '#2dd4bf',
-            weight: 1,
-            fillColor: '#2dd4bf',
-            fillOpacity: stale ? 0.04 : 0.08,
-            dashArray: stale ? '4 6' : null,
-          }}
-        />
-        {Number.isFinite(accuracy) && accuracy > 0 ? (
+        {gateway ? (
+          <Circle
+            center={gateway}
+            radius={range}
+            pathOptions={{
+              color: '#2dd4bf',
+              weight: 1,
+              fillColor: '#2dd4bf',
+              fillOpacity: stale ? 0.04 : 0.08,
+              dashArray: stale ? '4 6' : null,
+            }}
+          />
+        ) : null}
+        {gateway && Number.isFinite(accuracy) && accuracy > 0 ? (
           <Circle
             center={gateway}
             radius={Math.min(accuracy, 80)}
@@ -135,38 +120,42 @@ const GatewayRadarMap = ({
           />
         ) : null}
 
-        {plotted.map(({ peer, position }) => {
-          if (peer.connectionState === 'DISCONNECTED') return null;
-          return (
-            <Polyline
-              key={`link-${peer.peerId}`}
-              positions={[gateway, position]}
-              pathOptions={{
-                color: connectionColor(peer.connectionState),
-                weight: peer.connectionState === 'CONNECTED' ? 2.5 : 1.5,
-                opacity: stale ? 0.35 : 0.7,
-                dashArray: peer.connectionState === 'CONNECTED' ? null : '6 6',
-              }}
-            />
-          );
-        })}
+        {gateway
+          ? plotted.map(({ peer, position }) => {
+              if (peer.connectionState === 'DISCONNECTED') return null;
+              return (
+                <Polyline
+                  key={`link-${peer.peerId}`}
+                  positions={[gateway, position]}
+                  pathOptions={{
+                    color: connectionColor(peer.connectionState),
+                    weight: peer.connectionState === 'CONNECTED' ? 2.5 : 1.5,
+                    opacity: stale ? 0.35 : 0.7,
+                    dashArray: peer.connectionState === 'CONNECTED' ? null : '6 6',
+                  }}
+                />
+              );
+            })
+          : null}
 
-        <CircleMarker
-          center={gateway}
-          radius={11}
-          pathOptions={{
-            color: '#0f172a',
-            weight: 2,
-            fillColor: '#2dd4bf',
-            fillOpacity: stale ? 0.55 : 0.95,
-          }}
-        >
-          <Tooltip permanent direction="top" offset={[0, -10]}>
-            <span className="font-mono text-[11px]">
-              {snapshot?.displayName || 'Gateway'} · {formatCoord(gateway)}
-            </span>
-          </Tooltip>
-        </CircleMarker>
+        {gateway ? (
+          <CircleMarker
+            center={gateway}
+            radius={11}
+            pathOptions={{
+              color: '#0f172a',
+              weight: 2,
+              fillColor: '#2dd4bf',
+              fillOpacity: stale ? 0.55 : 0.95,
+            }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]}>
+              <span className="font-mono text-[11px]">
+                {snapshot?.displayName || 'Gateway'} · {formatCoord(gateway)}
+              </span>
+            </Tooltip>
+          </CircleMarker>
+        ) : null}
 
         {plotted.map(({ peer, position, source }) => {
           const selected = selectedPeerId === peer.peerId;
@@ -197,12 +186,19 @@ const GatewayRadarMap = ({
         })}
       </MapContainer>
 
-      <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded bg-white/90 px-2 py-1 font-mono text-[10px] text-slate-700 shadow">
-        {formatCoord(gateway)}
-        {Number.isFinite(accuracy) && accuracy > 0
-          ? ` ±${accuracy.toFixed(1)} m`
-          : ''}
-      </div>
+      {gateway ? (
+        <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded bg-white/90 px-2 py-1 font-mono text-[10px] text-slate-700 shadow">
+          {formatCoord(gateway)}
+          {Number.isFinite(accuracy) && accuracy > 0
+            ? ` ±${accuracy.toFixed(1)} m`
+            : ''}
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-[500] rounded bg-white/95 px-3 py-2 text-xs text-slate-700 shadow">
+          OpenStreetMap is live. Waiting for this phone’s GPS (keep the app
+          open with location on) so the user can be placed precisely.
+        </div>
+      )}
       <button
         type="button"
         className="absolute right-3 top-3 z-[500] rounded bg-white/95 px-2 py-1 text-xs font-medium text-slate-800 shadow"

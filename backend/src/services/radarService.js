@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import User from '../models/User.js';
+import EmergencyReport from '../models/EmergencyReport.js';
 import { AppError } from '../utils/asyncHandler.js';
 import {
   AdminSocketEvents,
@@ -95,7 +96,15 @@ export const publishRadarSnapshot = async (body, authenticatedUserId) => {
   }
 
   const peers = (body.peers || []).map(sanitizePeer);
-  const observerLocation = sanitizeGeoPoint(body.observerLocation);
+  let observerLocation = sanitizeGeoPoint(body.observerLocation);
+  if (!observerLocation) {
+    const lastOwnSos = await EmergencyReport.findOne({
+      originalSenderId: authenticatedUserId,
+    })
+      .sort({ lastUploadedAt: -1, createdAt: -1 })
+      .select('location');
+    observerLocation = sanitizeGeoPoint(lastOwnSos?.location);
+  }
   const observerAccuracyMeters = Number.isFinite(Number(body.observerAccuracyMeters))
     ? Number(body.observerAccuracyMeters)
     : null;

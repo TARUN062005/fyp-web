@@ -33,3 +33,4 @@ Thumbs.db
 *.tgz
 .cache/
 .vercel
+.env*.local

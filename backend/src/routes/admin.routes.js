@@ -12,6 +12,7 @@ import {
   postMergeClusters,
   getReports,
   getReportsExport,
+  deleteReport,
   getAuditLogs,
   getDevices,
   getUsers,
@@ -37,6 +38,7 @@ import {
   verifyClusterBodySchema,
   mergeClustersBodySchema,
   reportsQuerySchema,
+  deleteReportParamsSchema,
   auditLogsQuerySchema,
   devicesQuerySchema,
   usersQuerySchema,
@@ -124,6 +126,17 @@ router.get(
   ...adminGuard,
   validateRequest({ query: reportsQuerySchema }),
   getReportsExport
+);
+
+router.delete(
+  '/reports/:reportId',
+  ...adminGuard,
+  validateRequest({ params: deleteReportParamsSchema }),
+  auditLog('report.delete', (req) => ({
+    targetType: 'EmergencyReport',
+    targetId: req.params.reportId,
+  })),
+  deleteReport
 );
 
 router.get(

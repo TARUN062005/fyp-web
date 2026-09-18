@@ -74,7 +74,8 @@ const useAdminSocketController = (enabled = true) => {
       if (
         event === AdminSocketEvents.REPORT_CREATED ||
         event === AdminSocketEvents.REPORT_UPDATED ||
-        event === AdminSocketEvents.REPORT_CONSENSUS
+        event === AdminSocketEvents.REPORT_CONSENSUS ||
+        event === AdminSocketEvents.REPORT_DELETED
       ) {
         queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
       }

@@ -77,6 +77,23 @@ describe('dashboard live socket patches (no refetch)', () => {
     expect(fromUpdate.clustersToday).toBe(2);
   });
 
+  it('decrements active emergencies when a cluster is deleted', () => {
+    const before = {
+      activeEmergencies: 3,
+      clustersToday: 2,
+      verifiedUsers: 1,
+      blockedUsers: 0,
+      devicesOnline: 0,
+      generatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const after = applyDashboardSocketEvent(
+      before,
+      AdminSocketEvents.CLUSTER_DELETED
+    );
+    expect(after.activeEmergencies).toBe(2);
+    expect(after.generatedAt).not.toBe(before.generatedAt);
+  });
+
   it('increments verified users on user:created', () => {
     const before = {
       activeEmergencies: 1,

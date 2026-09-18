@@ -15,7 +15,14 @@ const shortId = (id) => {
   return s.length > 10 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s;
 };
 
-const ClusterReportsTable = ({ reports, isLoading, isError, error }) => {
+const ClusterReportsTable = ({
+  reports,
+  isLoading,
+  isError,
+  error,
+  onDelete,
+  deletingId,
+}) => {
   if (isLoading) {
     return (
       <p className="px-3 py-2 text-xs text-admin-muted" aria-live="polite">
@@ -52,6 +59,9 @@ const ClusterReportsTable = ({ reports, isLoading, isError, error }) => {
             <th className="px-3 py-2 font-medium">Uploader</th>
             <th className="px-3 py-2 font-medium">Timestamp</th>
             <th className="px-3 py-2 font-medium">Severity</th>
+            {onDelete ? (
+              <th className="px-3 py-2 font-medium">Actions</th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -70,6 +80,18 @@ const ClusterReportsTable = ({ reports, isLoading, isError, error }) => {
               <td className="px-3 py-2">
                 <SeverityBadge severity={r.severity} />
               </td>
+              {onDelete ? (
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    className="admin-btn-danger px-2 py-1"
+                    disabled={Boolean(deletingId)}
+                    onClick={() => onDelete(r)}
+                  >
+                    {deletingId === r.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>

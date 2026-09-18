@@ -7,10 +7,18 @@ import {
   formatAge,
   gatewayStatusFromAge,
   mergeGatewayList,
+  mergeRadarSnapshots,
   RadarSocketEvents,
   shouldApplyRadarUpdate,
 } from '../radar/radarModel.js';
-import { formatCoord, resolveGatewayLatLng, resolvePeerLatLng, toLatLng } from '../radar/radarGeo.js';
+import {
+  formatCoord,
+  formatDistanceLabel,
+  peerMapDistance,
+  resolveGatewayLatLng,
+  resolvePeerLatLng,
+  toLatLng,
+} from '../radar/radarGeo.js';
 import {
   fetchRadarGateway,
   fetchRadarGateways,
@@ -72,9 +80,11 @@ const LiveRadarPage = () => {
     if (!socket) return undefined;
 
     const onUpdated = (payload) => {
+      if (payload?.gatewayUserId) {
+        queryClient.setQueryData(radarGatewayQueryKey(payload.gatewayUserId), payload);
+      }
       if (!shouldApplyRadarUpdate(selectedId, payload)) return;
       setSnapshot(payload);
-      queryClient.setQueryData(radarGatewayQueryKey(selectedId), payload);
     };
     const onStatus = (payload) => {
       queryClient.setQueryData(radarGatewaysQueryKey, (prev) => ({
@@ -94,6 +104,27 @@ const LiveRadarPage = () => {
   }, [getSocket, connectionKey, selectedId, queryClient]);
 
   const gateways = gatewaysQuery.data?.gateways ?? [];
+  const liveGatewayIds = useMemo(
+    () =>
+      gateways
+        .filter((g) => g.status === 'LIVE')
+        .map((g) => g.gatewayUserId)
+        .filter((id) => id && id !== selectedId),
+    [gateways, selectedId]
+  );
+
+  const othersQuery = useQuery({
+    queryKey: ['admin', 'radar', 'mesh-others', selectedId, liveGatewayIds],
+    enabled: Boolean(selectedId),
+    queryFn: async () => {
+      const rows = await Promise.all(
+        liveGatewayIds.map((id) => fetchRadarGateway(id).catch(() => null))
+      );
+      return rows.filter(Boolean);
+    },
+    refetchInterval: 8_000,
+  });
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return gateways;
@@ -106,16 +137,23 @@ const LiveRadarPage = () => {
 
   const selectedGateway =
     gateways.find((g) => g.gatewayUserId === selectedId) || null;
-  const lastUpdatedAt = snapshot?.lastUpdatedAt || selectedGateway?.lastUpdatedAt;
+  const mergedSnapshot = useMemo(
+    () => mergeRadarSnapshots(snapshot, othersQuery.data || []),
+    [snapshot, othersQuery.data]
+  );
+  const lastUpdatedAt = mergedSnapshot?.lastUpdatedAt || selectedGateway?.lastUpdatedAt;
   const liveStatus =
-    snapshot?.status ||
+    mergedSnapshot?.status ||
     selectedGateway?.status ||
     gatewayStatusFromAge(lastUpdatedAt, now);
-  const peers = snapshot?.peers || [];
+  const peers = mergedSnapshot?.peers || [];
   const selectedPeer = peers.find((p) => p.peerId === selectedPeerId) || null;
-  const gatewayLatLng = resolveGatewayLatLng(snapshot);
+  const gatewayLatLng = resolveGatewayLatLng(mergedSnapshot);
   const selectedPeerMap = selectedPeer
     ? resolvePeerLatLng(selectedPeer, gatewayLatLng)
+    : null;
+  const selectedDistance = selectedPeer
+    ? peerMapDistance(selectedPeer, gatewayLatLng)
     : null;
   const stale = liveStatus !== 'LIVE';
 
@@ -134,9 +172,9 @@ const LiveRadarPage = () => {
         <div>
           <h2 className="admin-page-title">Live Radar</h2>
           <p className="admin-page-sub">
-            Real OpenStreetMap view of the selected phone. The gateway is
-            placed at live GPS (or last SOS location); nearby nodes use GPS
-            when known, otherwise RSSI distance.
+            Real OpenStreetMap view of the selected phone. Includes every node
+            this gateway sees on the mesh, plus radars from nearby phones that
+            also have internet. Distances use GPS when both have a fix.
           </p>
         </div>
         <p className="font-mono text-[11px] text-admin-muted">
@@ -219,8 +257,8 @@ const LiveRadarPage = () => {
                     Selected gateway
                   </p>
                   <h3 className="text-lg font-semibold">
-                    {selectedGateway?.displayName ||
-                      snapshot?.displayName ||
+                      {selectedGateway?.displayName ||
+                      mergedSnapshot?.displayName ||
                       'Gateway'}
                   </h3>
                 </div>
@@ -244,7 +282,7 @@ const LiveRadarPage = () => {
               <div className="mt-3">
                 <GatewayRadarMap
                   key={selectedId}
-                  snapshot={snapshot}
+                  snapshot={mergedSnapshot}
                   selectedPeerId={selectedPeerId}
                   onSelectPeer={(peer) => setSelectedPeerId(peer.peerId)}
                   stale={stale}
@@ -255,6 +293,7 @@ const LiveRadarPage = () => {
                 <ul className="mt-3 divide-y divide-admin-line border border-admin-line">
                   {peers.map((peer) => {
                     const gps = toLatLng(peer.location);
+                    const distance = peerMapDistance(peer, gatewayLatLng);
                     return (
                       <li key={peer.peerId}>
                         <button
@@ -270,9 +309,7 @@ const LiveRadarPage = () => {
                           <span className="font-medium">{peer.displayName}</span>
                           <span className="font-mono text-[11px] text-admin-muted">
                             {peer.connectionState.toLowerCase()} ·{' '}
-                            {peer.beyondRadarRange
-                              ? `>${snapshot?.radarRangeMeters || 20} m`
-                              : `${Number(peer.distanceMeters).toFixed(1)} m`}
+                            {formatDistanceLabel(distance)}
                             {gps ? ` · ${formatCoord(gps)}` : ''}
                           </span>
                         </button>
@@ -302,9 +339,7 @@ const LiveRadarPage = () => {
                     <div>
                       <dt className="text-xs text-admin-muted">Distance</dt>
                       <dd className="font-mono">
-                        {selectedPeer.beyondRadarRange
-                          ? `>${snapshot?.radarRangeMeters || 20} m (est.)`
-                          : `${Number(selectedPeer.distanceMeters).toFixed(1)} m (est.)`}
+                        {formatDistanceLabel(selectedDistance)}
                       </dd>
                     </div>
                     <div>

@@ -57,6 +57,41 @@ export const resolvePeerLatLng = (peer, gatewayLatLng) => {
   return { position: estimated, source: 'ESTIMATED' };
 };
 
+export const haversineMeters = ([lat1, lng1], [lat2, lng2]) => {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+export const peerMapDistance = (peer, gatewayLatLng) => {
+  const resolved = resolvePeerLatLng(peer, gatewayLatLng);
+  if (gatewayLatLng && resolved?.source === 'GPS') {
+    return {
+      meters: haversineMeters(gatewayLatLng, resolved.position),
+      source: 'GPS',
+    };
+  }
+  const meters = Number(peer?.distanceMeters);
+  if (!Number.isFinite(meters) || meters < 0) return null;
+  return { meters, source: resolved?.source === 'ESTIMATED' ? 'ESTIMATED' : 'RSSI' };
+};
+
+export const formatDistanceLabel = (distance) => {
+  if (!distance || !Number.isFinite(distance.meters)) return '—';
+  const meters = distance.meters;
+  const value =
+    meters < 10 ? `${meters.toFixed(1)} m` : `${Math.round(meters)} m`;
+  if (distance.source === 'GPS') return value;
+  return `${value} (est.)`;
+};
+
 export const connectionColor = (state) => {
   if (state === 'CONNECTED') return '#22c55e';
   if (state === 'DISCOVERED') return '#f59e0b';

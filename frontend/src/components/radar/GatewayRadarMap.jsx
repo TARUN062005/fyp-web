@@ -13,6 +13,8 @@ import 'leaflet/dist/leaflet.css';
 import {
   connectionColor,
   formatCoord,
+  formatDistanceLabel,
+  peerMapDistance,
   resolveGatewayLatLng,
   resolvePeerLatLng,
 } from '../../radar/radarGeo.js';
@@ -157,7 +159,7 @@ const GatewayRadarMap = ({
           </CircleMarker>
         ) : null}
 
-        {plotted.map(({ peer, position, source }) => {
+        {plotted.map(({ peer, position }) => {
           const selected = selectedPeerId === peer.peerId;
           const color = connectionColor(peer.connectionState);
           return (
@@ -177,8 +179,8 @@ const GatewayRadarMap = ({
             >
               <Tooltip direction="top" offset={[0, -8]}>
                 <span className="font-mono text-[11px]">
-                  {peer.displayName} · {Number(peer.distanceMeters).toFixed(1)} m
-                  {source === 'ESTIMATED' ? ' · est.' : ''}
+                  {peer.displayName} ·{' '}
+                  {formatDistanceLabel(peerMapDistance(peer, gateway))}
                 </span>
               </Tooltip>
             </CircleMarker>

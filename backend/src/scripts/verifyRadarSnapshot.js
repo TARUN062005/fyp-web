@@ -106,7 +106,7 @@ const run = async () => {
           peerId: 'p',
           displayName: 'X',
           connectionState: 'CONNECTED',
-          distanceMeters: 9999,
+          distanceMeters: 99_999,
           angleDegrees: 0,
         },
       ],

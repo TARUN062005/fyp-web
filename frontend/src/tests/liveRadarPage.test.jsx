@@ -139,7 +139,7 @@ describe('Live Radar', () => {
     expect(await screen.findByText('Person A')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Person A'));
     expect(screen.getByText('Selected node')).toBeInTheDocument();
-    expect(screen.getAllByText(/18\.4 m/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/18 m/).length).toBeGreaterThan(0);
   });
 
   it('applies a socket snapshot for the selected gateway only', async () => {

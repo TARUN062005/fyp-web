@@ -33,7 +33,7 @@ const radarPeerSchema = z.object({
   emergencyId: z.string().max(32).nullish(),
   displayName: z.string().min(1).max(80),
   connectionState: connectionStateSchema,
-  distanceMeters: finiteNumber(0, 200),
+  distanceMeters: finiteNumber(0, 20_000),
   beyondRadarRange: z.boolean().optional().default(false),
   angleDegrees: finiteNumber(-180, 180),
   lastSeen: z.preprocess(

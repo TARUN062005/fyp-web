@@ -45,6 +45,10 @@ export const mergeClustersBodySchema = z.object({
   targetClusterId: z.string().min(1),
 });
 
+export const deleteReportParamsSchema = z.object({
+  reportId: z.string().min(1).max(128),
+});
+
 export const reportsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),

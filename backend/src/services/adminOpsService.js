@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Device from '../models/Device.js';
 import EmergencyReport from '../models/EmergencyReport.js';
 import EmergencyCluster from '../models/EmergencyCluster.js';
+import EmergencyVote from '../models/EmergencyVote.js';
 import AuditLog from '../models/AuditLog.js';
 import AdminUser from '../models/AdminUser.js';
 import { AppError } from '../utils/asyncHandler.js';
@@ -182,6 +183,108 @@ export const mergeClusters = async ({ sourceClusterId, targetClusterId }) => {
     mergedAwayClusterId: source.clusterId,
   };
   emitToAdmin(AdminSocketEvents.CLUSTER_MERGED, payload);
+  return payload;
+};
+
+const findReportByKey = async (reportKey) => {
+  if (!reportKey) throw new AppError('reportId is required', 400);
+  const key = String(reportKey).trim();
+  if (/^[a-fA-F0-9]{24}$/.test(key)) {
+    const byId = await EmergencyReport.findById(key);
+    if (byId) return byId;
+  }
+  const byMessageId = await EmergencyReport.findOne({ messageId: key });
+  if (!byMessageId) {
+    throw new AppError('Report not found', 404);
+  }
+  return byMessageId;
+};
+
+const clusterPublicPayload = (cluster) => ({
+  id: String(cluster._id),
+  clusterId: cluster.clusterId,
+  emergencyType: cluster.emergencyType,
+  location: cluster.location,
+  severity: cluster.severity,
+  reportCount: cluster.reportCount,
+  confidenceScore: cluster.confidenceScore,
+  firstReportAt: cluster.firstReportAt,
+  lastReportAt: cluster.lastReportAt,
+  status: cluster.status,
+});
+
+const refreshClusterAfterReportRemoval = async (cluster) => {
+  const reports = await EmergencyReport.find({ clusterId: cluster._id })
+    .select('severity timestamp')
+    .lean();
+
+  if (reports.length === 0) {
+    const clusterId = cluster.clusterId;
+    const id = String(cluster._id);
+    await EmergencyCluster.deleteOne({ _id: cluster._id });
+    const payload = { clusterId, id };
+    emitToAdmin(AdminSocketEvents.CLUSTER_DELETED, payload);
+    return { deleted: true, ...payload };
+  }
+
+  const reportCount = reports.length;
+  const maxSenderSeverity = reports.reduce((best, r) => {
+    return severityRank(r.severity) > severityRank(best)
+      ? normalizeSeverity(r.severity)
+      : best;
+  }, 'LOW');
+  const timestamps = reports.map((r) => new Date(r.timestamp).getTime());
+  const confidenceScore = computeConfidenceScore({
+    reportCount,
+    distMeters: 0,
+  });
+  const severity = computeClusterSeverity({
+    maxSenderSeverity,
+    confidenceScore,
+    reportCount,
+    emergencyType: cluster.emergencyType,
+  });
+
+  cluster.reportCount = reportCount;
+  cluster.firstReportAt = new Date(Math.min(...timestamps));
+  cluster.lastReportAt = new Date(Math.max(...timestamps));
+  cluster.confidenceScore = confidenceScore;
+  cluster.severity = severity;
+  await cluster.save();
+
+  const payload = { cluster: clusterPublicPayload(cluster) };
+  emitToAdmin(AdminSocketEvents.CLUSTER_UPDATED, payload);
+  return { deleted: false, ...payload };
+};
+
+/**
+ * Permanently remove a cloud emergency report (admin). Does not retract
+ * copies already stored on mesh phones.
+ */
+export const deleteEmergencyReport = async (reportKey) => {
+  const report = await findReportByKey(reportKey);
+  const reportId = String(report._id);
+  const messageId = report.messageId;
+  const clusterObjectId = report.clusterId || null;
+
+  await EmergencyVote.deleteMany({ messageId });
+  await EmergencyReport.deleteOne({ _id: report._id });
+
+  let clusterResult = null;
+  if (clusterObjectId) {
+    const cluster = await EmergencyCluster.findById(clusterObjectId);
+    if (cluster) {
+      clusterResult = await refreshClusterAfterReportRemoval(cluster);
+    }
+  }
+
+  const payload = {
+    reportId,
+    messageId,
+    clusterId: clusterResult?.clusterId || clusterResult?.cluster?.clusterId || null,
+    clusterDeleted: clusterResult?.deleted === true,
+  };
+  emitToAdmin(AdminSocketEvents.REPORT_DELETED, payload);
   return payload;
 };
 

@@ -3,6 +3,7 @@ import {
   formatAge,
   gatewayStatusFromAge,
   mergeGatewayList,
+  mergeRadarSnapshots,
   shouldApplyRadarUpdate,
 } from '../radar/radarModel.js';
 
@@ -35,5 +36,39 @@ describe('radarModel', () => {
 
   it('formats last-update age', () => {
     expect(formatAge(Date.now() - 2000, Date.now())).toMatch(/2 seconds ago/);
+  });
+
+  it('merges another live radar that the selected gateway can see', () => {
+    const selected = {
+      gatewayUserId: 'gw-1',
+      displayName: 'Node 1',
+      peers: [
+        {
+          peerId: 'gw-n',
+          displayName: 'Node N',
+          connectionState: 'DISCOVERED',
+          distanceMeters: 40,
+        },
+      ],
+    };
+    const other = {
+      gatewayUserId: 'gw-n',
+      displayName: 'Node N',
+      observerLocation: { type: 'Point', coordinates: [79.86, 6.93] },
+      peers: [
+        {
+          peerId: 'hidden-peer',
+          displayName: 'Mesh Peer',
+          connectionState: 'CONNECTED',
+          distanceMeters: 8,
+          location: { type: 'Point', coordinates: [79.861, 6.931] },
+          locationSource: 'GPS',
+        },
+      ],
+    };
+    const merged = mergeRadarSnapshots(selected, [other]);
+    const names = merged.peers.map((p) => p.displayName);
+    expect(names).toContain('Node N');
+    expect(names).toContain('Mesh Peer');
   });
 });

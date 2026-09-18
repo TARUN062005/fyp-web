@@ -102,3 +102,9 @@ export const downloadBlob = (blob, filename) => {
   a.remove();
   URL.revokeObjectURL(url);
 };
+
+export const deleteReport = async (reportId) => {
+  const id = encodeURIComponent(String(reportId || '').trim());
+  const { data } = await api.delete(`/admin/reports/${id}`);
+  return data.data;
+};

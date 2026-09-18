@@ -7,6 +7,7 @@ import {
   mergeClusters,
   listReports,
   exportReports,
+  deleteEmergencyReport,
   listAuditLogs,
   listDevices,
   listUsers,
@@ -73,6 +74,20 @@ export const getReportsExport = asyncHandler(async (req, res) => {
     return res.status(200).send(result.content);
   }
   return ApiResponse.success(res, { reports: result.reports }, 'OK');
+});
+
+export const deleteReport = asyncHandler(async (req, res) => {
+  const result = await deleteEmergencyReport(req.params.reportId);
+  req.auditTarget = {
+    targetType: 'EmergencyReport',
+    targetId: result.reportId,
+    metadata: {
+      messageId: result.messageId,
+      clusterId: result.clusterId,
+      clusterDeleted: result.clusterDeleted,
+    },
+  };
+  return ApiResponse.success(res, result, 'Report deleted');
 });
 
 export const getAuditLogs = asyncHandler(async (req, res) => {

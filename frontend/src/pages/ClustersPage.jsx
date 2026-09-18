@@ -7,7 +7,9 @@ import {
   useVerifyCluster,
 } from '../hooks/useClusterMutations.js';
 import ClusterReportsTable from '../components/clusters/ClusterReportsTable.jsx';
+import ConfirmDeleteReportModal from '../components/reports/ConfirmDeleteReportModal.jsx';
 import { ErrorAlert, SeverityBadge } from '../components/ui/AdminState.jsx';
+import { useDeleteReport } from '../hooks/useReportMutations.js';
 
 const fmt = (value) => {
   if (!value) return '—';
@@ -20,13 +22,46 @@ const fmt = (value) => {
 
 const ExpandedReports = ({ clusterId }) => {
   const { data, isLoading, isError, error } = useClusterReports(clusterId, true);
+  const deleteMutation = useDeleteReport();
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleDelete = async (report) => {
+    setDeleteError(null);
+    try {
+      await deleteMutation.mutateAsync(report.id || report.messageId);
+      setPendingDelete(null);
+    } catch (err) {
+      setDeleteError(
+        err?.response?.data?.error?.message ||
+          err?.message ||
+          'Delete failed'
+      );
+    }
+  };
+
   return (
-    <ClusterReportsTable
-      reports={data?.reports}
-      isLoading={isLoading}
-      isError={isError}
-      error={error}
-    />
+    <>
+      {deleteError ? (
+        <p className="px-3 py-2 text-xs text-admin-danger" role="alert">
+          {deleteError}
+        </p>
+      ) : null}
+      <ClusterReportsTable
+        reports={data?.reports}
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        onDelete={setPendingDelete}
+        deletingId={deleteMutation.isPending ? pendingDelete?.id : null}
+      />
+      <ConfirmDeleteReportModal
+        report={pendingDelete}
+        busy={deleteMutation.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={handleDelete}
+      />
+    </>
   );
 };
 

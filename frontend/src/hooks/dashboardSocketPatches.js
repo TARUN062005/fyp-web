@@ -7,10 +7,12 @@ export const AdminSocketEvents = {
   REPORT_CREATED: 'report:created',
   REPORT_UPDATED: 'report:updated',
   REPORT_CONSENSUS: 'report:consensus',
+  REPORT_DELETED: 'report:deleted',
   CLUSTER_CREATED: 'cluster:created',
   CLUSTER_UPDATED: 'cluster:updated',
   CLUSTER_VERIFIED: 'cluster:verified',
   CLUSTER_MERGED: 'cluster:merged',
+  CLUSTER_DELETED: 'cluster:deleted',
   DEVICE_STATUS: 'device:status',
   USER_BLOCKED: 'user:blocked',
   USER_UNBLOCKED: 'user:unblocked',
@@ -41,6 +43,14 @@ export const applyDashboardSocketEvent = (summary, event, payload) => {
         activeEmergencies: Math.max((s.activeEmergencies ?? 1) - 1, 0),
         generatedAt: now,
       };
+    case AdminSocketEvents.CLUSTER_DELETED:
+      return {
+        ...s,
+        activeEmergencies: Math.max((s.activeEmergencies ?? 1) - 1, 0),
+        generatedAt: now,
+      };
+    case AdminSocketEvents.REPORT_DELETED:
+      return { ...s, generatedAt: now };
     case AdminSocketEvents.USER_CREATED:
       return {
         ...s,

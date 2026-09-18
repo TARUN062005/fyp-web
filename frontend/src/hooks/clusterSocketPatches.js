@@ -47,6 +47,12 @@ export const applyClustersSocketEvent = (clusters, event, payload) => {
       return next;
     }
 
+    case AdminSocketEvents.CLUSTER_DELETED:
+      return removeCluster(
+        clusters,
+        payload?.clusterId || payload?.id || payload?.cluster?.clusterId
+      );
+
     default:
       return clusters;
   }

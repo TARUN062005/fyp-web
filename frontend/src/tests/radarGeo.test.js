@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatCoord,
+  formatDistanceLabel,
   offsetLatLng,
+  peerMapDistance,
   resolvePeerLatLng,
   toLatLng,
 } from '../radar/radarGeo.js';
@@ -45,5 +47,20 @@ describe('radarGeo', () => {
 
   it('formats high-precision coordinates', () => {
     expect(formatCoord([6.9271234, 79.8612567])).toBe('6.927123, 79.861257');
+  });
+
+  it('uses GPS haversine instead of the 20 m radar clamp', () => {
+    const gateway = [6.9271, 79.8612];
+    const peer = {
+      location: { coordinates: [79.86122, 6.92712] },
+      locationSource: 'GPS',
+      distanceMeters: 80,
+      beyondRadarRange: true,
+    };
+    const distance = peerMapDistance(peer, gateway);
+    expect(distance.source).toBe('GPS');
+    expect(distance.meters).toBeGreaterThan(0);
+    expect(distance.meters).toBeLessThan(10);
+    expect(formatDistanceLabel(distance)).not.toMatch(/>20/);
   });
 });

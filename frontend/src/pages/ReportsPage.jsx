@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useReports } from '../hooks/useReports.js';
+import { useDeleteReport } from '../hooks/useReportMutations.js';
 import {
   buildReportParams,
   downloadBlob,
@@ -10,6 +11,7 @@ import {
   ErrorAlert,
   SeverityBadge,
 } from '../components/ui/AdminState.jsx';
+import ConfirmDeleteReportModal from '../components/reports/ConfirmDeleteReportModal.jsx';
 
 const emptyFilters = {
   severity: '',
@@ -58,6 +60,9 @@ const ReportsPage = () => {
   const [actionError, setActionError] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+
+  const deleteMutation = useDeleteReport();
 
   const queryFilters = useMemo(
     () => ({
@@ -135,6 +140,23 @@ const ReportsPage = () => {
       );
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async (report) => {
+    setActionError(null);
+    setActionMsg(null);
+    try {
+      await deleteMutation.mutateAsync(report.id || report.messageId);
+      setPendingDelete(null);
+      if (selectedId === report.id) setSelectedId(null);
+      setActionMsg(`Deleted ${report.messageId}`);
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.error?.message ||
+          err?.message ||
+          'Delete failed'
+      );
     }
   };
 
@@ -303,12 +325,13 @@ const ReportsPage = () => {
               <th className="px-3 py-2 font-medium">Hops</th>
               <th className="px-3 py-2 font-medium">Timestamp</th>
               <th className="px-3 py-2 font-medium">Sender</th>
+              <th className="px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && !reports.length ? (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-admin-muted">
+                <td colSpan={9} className="px-3 py-6 text-admin-muted">
                   Loading reports…
                 </td>
               </tr>
@@ -316,7 +339,7 @@ const ReportsPage = () => {
 
             {!isLoading && !reports.length ? (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-admin-muted">
+                <td colSpan={9} className="px-3 py-6 text-admin-muted">
                   No reports match the current filters.
                 </td>
               </tr>
@@ -356,6 +379,18 @@ const ReportsPage = () => {
                 >
                   {shortId(r.originalSenderId)}
                 </td>
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    className="admin-btn-danger px-2 py-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDelete(r);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -373,13 +408,22 @@ const ReportsPage = () => {
                 {selected.messageId}
               </h2>
             </div>
-            <button
-              type="button"
-              className="admin-btn"
-              onClick={() => setSelectedId(null)}
-            >
-              Close
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="admin-btn-danger"
+                onClick={() => setPendingDelete(selected)}
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={() => setSelectedId(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
             <div>
@@ -434,6 +478,13 @@ const ReportsPage = () => {
           </dl>
         </div>
       ) : null}
+
+      <ConfirmDeleteReportModal
+        report={pendingDelete}
+        busy={deleteMutation.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={handleDelete}
+      />
     </section>
   );
 };

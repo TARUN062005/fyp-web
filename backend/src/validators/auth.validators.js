@@ -5,6 +5,8 @@ export const googleAuthBodySchema = z.object({
   /** Required when creating a new identity; optional on restore / reinstall. */
   publicKey: z.string().min(1).optional(),
   publicKeyFingerprint: z.string().min(1).optional(),
+  /** SHA-256 hex mesh address; stored so reinstall restores the same P2P id. */
+  meshUserId: z.string().min(8).max(128).optional(),
 });
 
 export const adminLoginBodySchema = z.object({

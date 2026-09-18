@@ -58,6 +58,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /**
+     * SHA-256 hex mesh address from the Android client. Survives reinstall
+     * so chats keep the same peer id for the same Google account.
+     */
+    meshUserId: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: true },
@@ -69,6 +79,7 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ googleAccountId: 1 }, { unique: true, sparse: true });
 userSchema.index({ emergencyId: 1 }, { unique: true });
 userSchema.index({ publicKey: 1 });
+userSchema.index({ meshUserId: 1 }, { unique: true, sparse: true });
 
 const User = mongoose.model('User', userSchema);
 

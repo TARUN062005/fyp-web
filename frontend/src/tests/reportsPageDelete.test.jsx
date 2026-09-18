@@ -16,6 +16,8 @@ vi.mock('../hooks/useReports.js', () => ({
           hopCount: 0,
           timestamp: '2026-01-01T00:00:00.000Z',
           originalSenderId: 'u1',
+          originalSender: { id: 'u1', displayName: 'Ada', emergencyId: 'EDTN-ADA01', isVerified: true },
+          receivedBy: { id: 'u2', displayName: 'Sam', emergencyId: 'EDTN-SAM02', isVerified: true },
         },
       ],
       total: 1,
@@ -50,6 +52,11 @@ describe('ReportsPage delete', () => {
   it('opens a confirm dialog then deletes the report', async () => {
     mutateAsync.mockResolvedValue({ reportId: 'r1', messageId: 'msg-sos-1' });
     render(<ReportsPage />);
+
+    expect(screen.getByText('Sender')).toBeTruthy();
+    expect(screen.getByText('Received via')).toBeTruthy();
+    expect(screen.getByText(/Ada · EDTN-ADA01/)).toBeTruthy();
+    expect(screen.getByText(/Sam · EDTN-SAM02/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
     expect(screen.getByRole('dialog', { name: /delete this emergency report/i })).toBeTruthy();

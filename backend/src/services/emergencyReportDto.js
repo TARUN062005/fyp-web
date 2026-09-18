@@ -1,10 +1,33 @@
 /**
  * Shared EmergencyReport → API DTO mapper (upload + admin + consensus).
  */
+const asUserSummary = (value) => {
+  if (!value) return null;
+  if (typeof value === 'object' && (value._id || value.id)) {
+    return {
+      id: String(value._id || value.id),
+      displayName: value.displayName || null,
+      emergencyId: value.emergencyId || null,
+      isVerified: Boolean(value.isVerified),
+    };
+  }
+  return {
+    id: String(value),
+    displayName: null,
+    emergencyId: null,
+    isVerified: false,
+  };
+};
+
 export const toEmergencyReportDto = (report) => {
   if (!report) return null;
   const uploaders = Array.isArray(report.uploaders)
-    ? report.uploaders.map((id) => String(id))
+    ? report.uploaders.map((id) => String(id?._id || id))
+    : [];
+  const originalSender = asUserSummary(report.originalSenderId);
+  const receivedBy = asUserSummary(report.uploaderId);
+  const uploadersDetail = Array.isArray(report.uploaders)
+    ? report.uploaders.map((u) => asUserSummary(u)).filter(Boolean)
     : [];
   const trueVotes = Number(report.trueVotes) || 0;
   const falseVotes = Number(report.falseVotes) || 0;
@@ -15,9 +38,12 @@ export const toEmergencyReportDto = (report) => {
   return {
     id: String(report._id),
     messageId: report.messageId,
-    originalSenderId: String(report.originalSenderId),
-    uploaderId: String(report.uploaderId),
+    originalSenderId: originalSender?.id || String(report.originalSenderId),
+    uploaderId: receivedBy?.id || String(report.uploaderId),
+    originalSender,
+    receivedBy,
     uploaders,
+    uploadersDetail,
     uploadCount: Number(report.uploadCount) || uploaders.length || 1,
     relayCount: Number(report.relayCount) || 0,
     hopCount: Number(report.hopCount) || 0,

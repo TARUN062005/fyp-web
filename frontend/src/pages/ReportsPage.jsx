@@ -52,6 +52,14 @@ const shortId = (id) => {
   return s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s;
 };
 
+const personLabel = (summary, fallbackId) => {
+  if (summary?.displayName) {
+    const id = summary.emergencyId ? ` · ${summary.emergencyId}` : '';
+    return `${summary.displayName}${id}`;
+  }
+  return shortId(summary?.id || fallbackId);
+};
+
 const ReportsPage = () => {
   const [draft, setDraft] = useState(emptyFilters);
   const [applied, setApplied] = useState(emptyFilters);
@@ -325,13 +333,14 @@ const ReportsPage = () => {
               <th className="px-3 py-2 font-medium">Hops</th>
               <th className="px-3 py-2 font-medium">Timestamp</th>
               <th className="px-3 py-2 font-medium">Sender</th>
+              <th className="px-3 py-2 font-medium">Received via</th>
               <th className="px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && !reports.length ? (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-admin-muted">
+                <td colSpan={10} className="px-3 py-6 text-admin-muted">
                   Loading reports…
                 </td>
               </tr>
@@ -339,7 +348,7 @@ const ReportsPage = () => {
 
             {!isLoading && !reports.length ? (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-admin-muted">
+                <td colSpan={10} className="px-3 py-6 text-admin-muted">
                   No reports match the current filters.
                 </td>
               </tr>
@@ -374,10 +383,16 @@ const ReportsPage = () => {
                   {fmt(r.timestamp)}
                 </td>
                 <td
-                  className="px-3 py-2 font-mono text-xs"
+                  className="px-3 py-2 text-xs"
                   title={r.originalSenderId}
                 >
-                  {shortId(r.originalSenderId)}
+                  {personLabel(r.originalSender, r.originalSenderId)}
+                </td>
+                <td
+                  className="px-3 py-2 text-xs"
+                  title={r.uploaderId}
+                >
+                  {personLabel(r.receivedBy, r.uploaderId)}
                 </td>
                 <td className="px-3 py-2">
                   <button
@@ -427,17 +442,26 @@ const ReportsPage = () => {
           </div>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-admin-muted">Original sender</dt>
-              <dd className="font-mono text-xs">{selected.originalSenderId}</dd>
+              <dt className="text-xs text-admin-muted">Who sent</dt>
+              <dd className="text-xs">
+                {personLabel(selected.originalSender, selected.originalSenderId)}
+                {selected.originalSender?.isVerified ? ' · verified' : ''}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs text-admin-muted">First uploader</dt>
-              <dd className="font-mono text-xs">{selected.uploaderId}</dd>
+              <dt className="text-xs text-admin-muted">Received to website by</dt>
+              <dd className="text-xs">
+                {personLabel(selected.receivedBy, selected.uploaderId)}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs text-admin-muted">Uploaders</dt>
-              <dd className="font-mono text-xs break-all">
-                {(selected.uploaders || []).join(', ') || '—'}
+              <dt className="text-xs text-admin-muted">All uploaders (no duplicate report)</dt>
+              <dd className="text-xs break-all">
+                {(selected.uploadersDetail || [])
+                  .map((u) => personLabel(u, u.id))
+                  .join(', ') ||
+                  (selected.uploaders || []).join(', ') ||
+                  '—'}
               </dd>
             </div>
             <div>

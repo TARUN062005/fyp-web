@@ -85,6 +85,28 @@ const createUserWithUniqueEmergencyId = async (fields) => {
   throw new AppError('Could not allocate a unique emergencyId', 500);
 };
 
+const normalizeMeshUserId = (value) => {
+  const id = String(value || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{16,128}$/.test(id)) return null;
+  return id;
+};
+
+const rememberMeshUserId = async (user, candidate) => {
+  if (user.meshUserId) return user.meshUserId;
+  const id = normalizeMeshUserId(candidate);
+  if (!id) return null;
+  user.meshUserId = id;
+  try {
+    await user.save();
+    return id;
+  } catch (err) {
+    if (err?.code === 11000) {
+      return user.meshUserId || null;
+    }
+    throw err;
+  }
+};
+
 const completeSession = async (user) => {
   assertNotBlocked(user);
   user.lastSeenAt = new Date();
@@ -94,6 +116,7 @@ const completeSession = async (user) => {
     status: 'authenticated',
     ...tokens,
     userId: String(user._id),
+    meshUserId: user.meshUserId || null,
     profile: toPublicProfile(user),
   };
 };
@@ -127,7 +150,7 @@ const reassociatePublicKeyIfNeeded = async (
  */
 export const authenticateWithGoogle = async (
   idToken,
-  { publicKey, publicKeyFingerprint } = {}
+  { publicKey, publicKeyFingerprint, meshUserId } = {}
 ) => {
   const { googleAccountId, displayName } = await verifyGoogleIdToken(idToken);
 
@@ -138,6 +161,7 @@ export const authenticateWithGoogle = async (
       publicKey,
       publicKeyFingerprint
     );
+    await rememberMeshUserId(existing, meshUserId);
     const session = await completeSession(existing);
     return {
       ...session,
@@ -164,6 +188,7 @@ export const authenticateWithGoogle = async (
       publicKeyFingerprint: fingerprint,
       isVerified: true,
       lastSeenAt: new Date(),
+      meshUserId: normalizeMeshUserId(meshUserId),
     });
   } catch (err) {
     if (err?.code === 11000) {
@@ -174,6 +199,7 @@ export const authenticateWithGoogle = async (
           publicKey,
           publicKeyFingerprint
         );
+        await rememberMeshUserId(raced, meshUserId);
         const session = await completeSession(raced);
         return {
           ...session,

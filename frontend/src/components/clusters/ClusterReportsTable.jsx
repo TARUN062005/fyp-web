@@ -15,6 +15,14 @@ const shortId = (id) => {
   return s.length > 10 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s;
 };
 
+const personLabel = (summary, fallbackId) => {
+  if (summary?.displayName) {
+    const extra = summary.emergencyId ? ` · ${summary.emergencyId}` : '';
+    return `${summary.displayName}${extra}`;
+  }
+  return shortId(summary?.id || fallbackId);
+};
+
 const ClusterReportsTable = ({
   reports,
   isLoading,
@@ -70,11 +78,11 @@ const ClusterReportsTable = ({
               <td className="px-3 py-2 font-mono text-admin-ink">
                 {r.messageId}
               </td>
-              <td className="px-3 py-2 font-mono" title={r.originalSenderId}>
-                {shortId(r.originalSenderId)}
+              <td className="px-3 py-2" title={r.originalSenderId}>
+                {personLabel(r.originalSender, r.originalSenderId)}
               </td>
-              <td className="px-3 py-2 font-mono" title={r.uploaderId}>
-                {shortId(r.uploaderId)}
+              <td className="px-3 py-2" title={r.uploaderId}>
+                {personLabel(r.receivedBy, r.uploaderId)}
               </td>
               <td className="px-3 py-2 font-mono">{fmt(r.timestamp)}</td>
               <td className="px-3 py-2">

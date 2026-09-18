@@ -348,6 +348,9 @@ export const listReports = async (query) => {
       .sort({ timestamp: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
+      .populate('originalSenderId', 'displayName emergencyId isVerified')
+      .populate('uploaderId', 'displayName emergencyId isVerified')
+      .populate('uploaders', 'displayName emergencyId isVerified')
       .lean(),
   ]);
 
@@ -375,6 +378,9 @@ export const exportReports = async (query) => {
   const rows = await EmergencyReport.find(filter)
     .sort({ timestamp: -1 })
     .limit(5000)
+    .populate('originalSenderId', 'displayName emergencyId isVerified')
+    .populate('uploaderId', 'displayName emergencyId isVerified')
+    .populate('uploaders', 'displayName emergencyId isVerified')
     .lean();
 
   const reports = rows.map(toReportDto);

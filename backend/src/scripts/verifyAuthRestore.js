@@ -32,8 +32,11 @@ const run = async () => {
   const mockToken = `mock:${GOOGLE_ID}:${DISPLAY}`;
 
   // --- Install 1: Google + publicKey → create identity + certificate ---
+  const MESH_USER_ID = 'a'.repeat(64);
+
   const created = await authenticateWithGoogle(mockToken, {
     publicKey: PUBLIC_KEY,
+    meshUserId: MESH_USER_ID,
   });
 
   assert(created.status === 'created', `Install 1 expected created, got ${created.status}`);
@@ -44,6 +47,8 @@ const run = async () => {
   );
   assert(created.accessToken && created.refreshToken, 'Install 1 missing JWT pair');
   assert(created.userId, 'Install 1 missing Mongo userId on session');
+  assert(created.meshUserId === MESH_USER_ID, 'Install 1 missing meshUserId');
+  assert(created.profile.isVerified === true, 'Install 1 should be verified');
 
   const emergencyId1 = created.profile.emergencyId;
   console.log(`[verify] Install 1 emergencyId = ${emergencyId1}`);
@@ -54,12 +59,20 @@ const run = async () => {
   assert(storedRefresh >= 1, 'Refresh token was not stored (hashed) in MongoDB');
 
   // --- Install 2: same Google account → must RESTORE same emergencyId ---
-  const google2 = await authenticateWithGoogle(mockToken);
+  const google2 = await authenticateWithGoogle(mockToken, {
+    publicKey: 'install-2-new-device-key',
+    meshUserId: 'b'.repeat(64),
+  });
   assert(google2.status === 'restored', `Install 2 Google expected restored, got ${google2.status}`);
   assert(
     google2.profile.emergencyId === emergencyId1,
     `Install 2 Google restore mismatch: ${google2.profile.emergencyId} !== ${emergencyId1}`
   );
+  assert(
+    google2.meshUserId === MESH_USER_ID,
+    `Install 2 meshUserId changed: ${google2.meshUserId}`
+  );
+  assert(google2.profile.isVerified === true, 'Install 2 should keep verified');
   console.log(
     `[verify] Install 2 Google restore emergencyId = ${google2.profile.emergencyId}`
   );

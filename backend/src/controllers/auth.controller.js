@@ -7,10 +7,11 @@ import {
 } from '../services/authService.js';
 
 export const googleAuth = asyncHandler(async (req, res) => {
-  const { idToken, publicKey, publicKeyFingerprint } = req.body;
+  const { idToken, publicKey, publicKeyFingerprint, meshUserId } = req.body;
   const result = await authenticateWithGoogle(idToken, {
     publicKey,
     publicKeyFingerprint,
+    meshUserId,
   });
   return ApiResponse.success(res, result, 'OK');
 });

@@ -68,4 +68,18 @@ describe('ReportsPage delete', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete report/i }));
     expect(mutateAsync).toHaveBeenCalledWith('r1');
   });
+
+  it('opens SOS detail when a row is clicked', () => {
+    render(<ReportsPage />);
+    fireEvent.click(screen.getByText('msg-sos-1'));
+    expect(screen.getByText('SOS detail')).toBeTruthy();
+    expect(screen.getByText(/Personal SOS from a phone in danger/)).toBeTruthy();
+  });
+
+  it('opens bulk delete confirm for selected reports', () => {
+    render(<ReportsPage />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /select msg-sos-1/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete selected \(1\)/i }));
+    expect(screen.getByRole('dialog', { name: /delete 1 report/i })).toBeTruthy();
+  });
 });

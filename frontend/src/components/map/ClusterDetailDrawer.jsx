@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { SeverityBadge } from '../ui/AdminState.jsx';
+import { SeverityBadge, AlertKindBadge } from '../ui/AdminState.jsx';
 
 const fmt = (value) => {
   if (!value) return '—';
@@ -59,6 +59,7 @@ const ClusterDetailDrawer = ({ cluster, onClose }) => {
 
       <div className="flex-1 space-y-4 overflow-auto px-4 py-4 text-sm">
         <div className="flex flex-wrap items-center gap-2">
+          <AlertKindBadge emergencyType={cluster.emergencyType} />
           <SeverityBadge severity={cluster.severity} />
           <span className="font-mono text-xs uppercase text-admin-muted">
             {cluster.status}
@@ -66,6 +67,12 @@ const ClusterDetailDrawer = ({ cluster, onClose }) => {
         </div>
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+          <dt className="text-admin-muted">Kind</dt>
+          <dd className="text-admin-ink">
+            {String(cluster.emergencyType || '').toLowerCase() === 'sos'
+              ? 'Personal SOS'
+              : 'Broadcast alert'}
+          </dd>
           <dt className="text-admin-muted">Type</dt>
           <dd className="text-admin-ink">{cluster.emergencyType || '—'}</dd>
           <dt className="text-admin-muted">Reports</dt>

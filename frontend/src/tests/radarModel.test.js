@@ -70,5 +70,8 @@ describe('radarModel', () => {
     const names = merged.peers.map((p) => p.displayName);
     expect(names).toContain('Node N');
     expect(names).toContain('Mesh Peer');
+    const nodeN = merged.peers.find((p) => p.peerId === 'gw-n');
+    expect(nodeN.distanceMeters).toBe(40);
+    expect(nodeN.location).toBeUndefined();
   });
 });

@@ -10,9 +10,11 @@ import {
   postUnblockUser,
   postVerifyCluster,
   postMergeClusters,
+  postDeleteClusters,
   getReports,
   getReportsExport,
   deleteReport,
+  postDeleteReports,
   getAuditLogs,
   getDevices,
   getUsers,
@@ -37,6 +39,8 @@ import {
   unblockUserBodySchema,
   verifyClusterBodySchema,
   mergeClustersBodySchema,
+  deleteClustersBodySchema,
+  deleteReportsBodySchema,
   reportsQuerySchema,
   deleteReportParamsSchema,
   auditLogsQuerySchema,
@@ -114,6 +118,14 @@ router.post(
   postMergeClusters
 );
 
+router.post(
+  '/delete-clusters',
+  ...adminGuard,
+  validateRequest({ body: deleteClustersBodySchema }),
+  auditLog('cluster.delete'),
+  postDeleteClusters
+);
+
 router.get(
   '/reports',
   ...adminGuard,
@@ -137,6 +149,14 @@ router.delete(
     targetId: req.params.reportId,
   })),
   deleteReport
+);
+
+router.post(
+  '/delete-reports',
+  ...adminGuard,
+  validateRequest({ body: deleteReportsBodySchema }),
+  auditLog('report.delete'),
+  postDeleteReports
 );
 
 router.get(

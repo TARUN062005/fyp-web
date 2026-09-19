@@ -1,4 +1,4 @@
-import { SeverityBadge } from '../ui/AdminState.jsx';
+import { AlertKindBadge, SeverityBadge } from '../ui/AdminState.jsx';
 
 const fmt = (value) => {
   if (!value) return '—';
@@ -30,6 +30,11 @@ const ClusterReportsTable = ({
   error,
   onDelete,
   deletingId,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleAll,
+  onOpen,
+  openId,
 }) => {
   if (isLoading) {
     return (
@@ -57,12 +62,26 @@ const ClusterReportsTable = ({
     );
   }
 
+  const allSelected =
+    reports.length > 0 && reports.every((r) => selectedIds.includes(r.id));
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[36rem] text-left text-xs">
+      <table className="w-full min-w-[44rem] text-left text-xs">
         <thead>
           <tr className="border-b border-admin-line text-admin-muted">
-            <th className="px-3 py-2 font-medium">Message</th>
+            {onToggleSelect ? (
+              <th className="px-3 py-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={onToggleAll}
+                  aria-label="Select all reports in this cluster"
+                />
+              </th>
+            ) : null}
+            <th className="px-3 py-2 font-medium">Kind</th>
+            <th className="px-3 py-2 font-medium">Type</th>
             <th className="px-3 py-2 font-medium">Original sender</th>
             <th className="px-3 py-2 font-medium">Uploader</th>
             <th className="px-3 py-2 font-medium">Timestamp</th>
@@ -73,35 +92,57 @@ const ClusterReportsTable = ({
           </tr>
         </thead>
         <tbody>
-          {reports.map((r) => (
-            <tr key={r.id} className="border-b border-admin-line/70">
-              <td className="px-3 py-2 font-mono text-admin-ink">
-                {r.messageId}
-              </td>
-              <td className="px-3 py-2" title={r.originalSenderId}>
-                {personLabel(r.originalSender, r.originalSenderId)}
-              </td>
-              <td className="px-3 py-2" title={r.uploaderId}>
-                {personLabel(r.receivedBy, r.uploaderId)}
-              </td>
-              <td className="px-3 py-2 font-mono">{fmt(r.timestamp)}</td>
-              <td className="px-3 py-2">
-                <SeverityBadge severity={r.severity} />
-              </td>
-              {onDelete ? (
+          {reports.map((r) => {
+            const open = openId === r.id;
+            return (
+              <tr
+                key={r.id}
+                className={[
+                  'border-b border-admin-line/70',
+                  onOpen ? 'cursor-pointer hover:bg-admin-surface/80' : '',
+                  open ? 'bg-admin-accent-soft/40' : '',
+                ].join(' ')}
+                onClick={() => onOpen?.(r)}
+              >
+                {onToggleSelect ? (
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(r.id)}
+                      onChange={() => onToggleSelect(r.id)}
+                      aria-label={`Select ${r.messageId}`}
+                    />
+                  </td>
+                ) : null}
                 <td className="px-3 py-2">
-                  <button
-                    type="button"
-                    className="admin-btn-danger px-2 py-1"
-                    disabled={Boolean(deletingId)}
-                    onClick={() => onDelete(r)}
-                  >
-                    {deletingId === r.id ? 'Deleting…' : 'Delete'}
-                  </button>
+                  <AlertKindBadge emergencyType={r.emergencyType} />
                 </td>
-              ) : null}
-            </tr>
-          ))}
+                <td className="px-3 py-2 capitalize">{r.emergencyType || '—'}</td>
+                <td className="px-3 py-2" title={r.originalSenderId}>
+                  {personLabel(r.originalSender, r.originalSenderId)}
+                </td>
+                <td className="px-3 py-2" title={r.uploaderId}>
+                  {personLabel(r.receivedBy, r.uploaderId)}
+                </td>
+                <td className="px-3 py-2 font-mono">{fmt(r.timestamp)}</td>
+                <td className="px-3 py-2">
+                  <SeverityBadge severity={r.severity} />
+                </td>
+                {onDelete ? (
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="admin-btn-danger px-2 py-1"
+                      disabled={Boolean(deletingId)}
+                      onClick={() => onDelete(r)}
+                    >
+                      {deletingId === r.id ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -37,6 +37,10 @@ vi.mock('../hooks/useReportMutations.js', () => ({
     mutateAsync,
     isPending: false,
   }),
+  useDeleteReports: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 vi.mock('../services/reportService.js', async (importOriginal) => {

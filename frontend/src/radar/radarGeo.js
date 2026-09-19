@@ -43,10 +43,8 @@ export const resolveGatewayLatLng = (snapshot) =>
   toLatLng(snapshot?.observerLocation);
 
 export const resolvePeerLatLng = (peer, gatewayLatLng) => {
-  const gps = toLatLng(peer?.location);
-  if (gps) {
-    return { position: gps, source: peer.locationSource === 'ESTIMATED' ? 'ESTIMATED' : 'GPS' };
-  }
+  // Nearby mesh distances are RSSI/visual-sector estimates. Phone GPS is
+  // typically ±10–20 m and would stretch a 1 m peer across the map.
   if (!gatewayLatLng) return null;
   const estimated = offsetLatLng(
     gatewayLatLng,
@@ -71,16 +69,9 @@ export const haversineMeters = ([lat1, lng1], [lat2, lng2]) => {
 };
 
 export const peerMapDistance = (peer, gatewayLatLng) => {
-  const resolved = resolvePeerLatLng(peer, gatewayLatLng);
-  if (gatewayLatLng && resolved?.source === 'GPS') {
-    return {
-      meters: haversineMeters(gatewayLatLng, resolved.position),
-      source: 'GPS',
-    };
-  }
   const meters = Number(peer?.distanceMeters);
   if (!Number.isFinite(meters) || meters < 0) return null;
-  return { meters, source: resolved?.source === 'ESTIMATED' ? 'ESTIMATED' : 'RSSI' };
+  return { meters, source: 'RSSI' };
 };
 
 export const formatDistanceLabel = (distance) => {

@@ -102,14 +102,10 @@ export const verifyCluster = async ({ clusterId }) => {
   return payload;
 };
 
-export const mergeClusters = async ({ sourceClusterId, targetClusterId }) => {
-  if (String(sourceClusterId) === String(targetClusterId)) {
+const mergeTwoClusters = async (source, target) => {
+  if (String(source._id) === String(target._id)) {
     throw new AppError('source and target cluster IDs must differ', 400);
   }
-
-  const source = await findClusterByKey(sourceClusterId);
-  const target = await findClusterByKey(targetClusterId);
-
   if (source.emergencyType !== target.emergencyType) {
     throw new AppError(
       'Cannot merge clusters with different emergencyType',
@@ -117,7 +113,6 @@ export const mergeClusters = async ({ sourceClusterId, targetClusterId }) => {
     );
   }
 
-  // Sequential updates (no multi-doc transaction) — fine for single-instance Mongo.
   await EmergencyReport.updateMany(
     { clusterId: source._id },
     { $set: { clusterId: target._id } }
@@ -168,22 +163,112 @@ export const mergeClusters = async ({ sourceClusterId, targetClusterId }) => {
 
   const merged = await EmergencyCluster.findById(target._id);
   const payload = {
-    cluster: {
-      id: String(merged._id),
-      clusterId: merged.clusterId,
-      emergencyType: merged.emergencyType,
-      severity: merged.severity,
-      reportCount: merged.reportCount,
-      confidenceScore: merged.confidenceScore,
-      firstReportAt: merged.firstReportAt,
-      lastReportAt: merged.lastReportAt,
-      status: merged.status,
-      location: merged.location,
-    },
+    cluster: clusterPublicPayload(merged),
     mergedAwayClusterId: source.clusterId,
+    mergedAwayClusterIds: [source.clusterId],
   };
   emitToAdmin(AdminSocketEvents.CLUSTER_MERGED, payload);
   return payload;
+};
+
+const uniqueClustersInOrder = async (keys) => {
+  const loaded = [];
+  const seen = new Set();
+  for (const key of keys) {
+    const cluster = await findClusterByKey(key);
+    const id = String(cluster._id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    loaded.push(cluster);
+  }
+  return loaded;
+};
+
+export const mergeClusters = async ({
+  sourceClusterId,
+  targetClusterId,
+  clusterIds,
+}) => {
+  if (Array.isArray(clusterIds) && clusterIds.length >= 2) {
+    const loaded = await uniqueClustersInOrder(clusterIds);
+    if (loaded.length < 2) {
+      throw new AppError('Select at least two different clusters', 400);
+    }
+    const types = new Set(loaded.map((c) => c.emergencyType));
+    if (types.size !== 1) {
+      throw new AppError(
+        'Cannot merge clusters with different emergencyType',
+        400
+      );
+    }
+    loaded.sort((a, b) => {
+      const byCount = (b.reportCount || 0) - (a.reportCount || 0);
+      if (byCount !== 0) return byCount;
+      return (
+        new Date(a.firstReportAt).getTime() - new Date(b.firstReportAt).getTime()
+      );
+    });
+    let target = loaded[0];
+    const mergedAwayClusterIds = [];
+    let lastPayload = null;
+    for (const source of loaded.slice(1)) {
+      lastPayload = await mergeTwoClusters(source, target);
+      mergedAwayClusterIds.push(source.clusterId);
+      target = await EmergencyCluster.findById(target._id);
+    }
+    return {
+      ...lastPayload,
+      mergedAwayClusterId: mergedAwayClusterIds[mergedAwayClusterIds.length - 1],
+      mergedAwayClusterIds,
+    };
+  }
+
+  if (String(sourceClusterId) === String(targetClusterId)) {
+    throw new AppError('source and target cluster IDs must differ', 400);
+  }
+  const source = await findClusterByKey(sourceClusterId);
+  const target = await findClusterByKey(targetClusterId);
+  return mergeTwoClusters(source, target);
+};
+
+export const deleteClusters = async ({ clusterIds }) => {
+  const loaded = await uniqueClustersInOrder(clusterIds || []);
+  if (loaded.length === 0) {
+    throw new AppError('No matching clusters to delete', 404);
+  }
+  const deleted = [];
+  for (const cluster of loaded) {
+    const reports = await EmergencyReport.find({ clusterId: cluster._id })
+      .select('messageId')
+      .lean();
+    const messageIds = reports.map((r) => r.messageId).filter(Boolean);
+    if (messageIds.length) {
+      await EmergencyVote.deleteMany({ messageId: { $in: messageIds } });
+    }
+    await EmergencyReport.deleteMany({ clusterId: cluster._id });
+    await EmergencyCluster.deleteOne({ _id: cluster._id });
+    const payload = {
+      clusterId: cluster.clusterId,
+      id: String(cluster._id),
+    };
+    emitToAdmin(AdminSocketEvents.CLUSTER_DELETED, payload);
+    deleted.push(payload);
+  }
+  return { deleted };
+};
+
+export const deleteEmergencyReports = async ({ reportIds }) => {
+  const unique = [...new Set((reportIds || []).map((id) => String(id).trim()))].filter(
+    Boolean
+  );
+  if (unique.length === 0) {
+    throw new AppError('reportIds is required', 400);
+  }
+  const deleted = [];
+  for (const key of unique) {
+    deleted.push(await deleteEmergencyReport(key));
+  }
+  return { deleted };
 };
 
 const findReportByKey = async (reportKey) => {

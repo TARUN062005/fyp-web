@@ -5,9 +5,11 @@ import {
   unblockUser,
   verifyCluster,
   mergeClusters,
+  deleteClusters,
   listReports,
   exportReports,
   deleteEmergencyReport,
+  deleteEmergencyReports,
   listAuditLogs,
   listDevices,
   listUsers,
@@ -51,10 +53,25 @@ export const postMergeClusters = asyncHandler(async (req, res) => {
     metadata: {
       sourceClusterId: req.body.sourceClusterId,
       targetClusterId: req.body.targetClusterId,
+      clusterIds: req.body.clusterIds,
       mergedAwayClusterId: result.mergedAwayClusterId,
+      mergedAwayClusterIds: result.mergedAwayClusterIds,
     },
   };
   return ApiResponse.success(res, result, 'Clusters merged');
+});
+
+export const postDeleteClusters = asyncHandler(async (req, res) => {
+  const result = await deleteClusters(req.body);
+  req.auditTarget = {
+    targetType: 'EmergencyCluster',
+    targetId: result.deleted?.[0]?.clusterId,
+    metadata: {
+      clusterIds: result.deleted?.map((row) => row.clusterId),
+      count: result.deleted?.length || 0,
+    },
+  };
+  return ApiResponse.success(res, result, 'Clusters deleted');
 });
 
 export const getReports = asyncHandler(async (req, res) => {
@@ -88,6 +105,19 @@ export const deleteReport = asyncHandler(async (req, res) => {
     },
   };
   return ApiResponse.success(res, result, 'Report deleted');
+});
+
+export const postDeleteReports = asyncHandler(async (req, res) => {
+  const result = await deleteEmergencyReports(req.body);
+  req.auditTarget = {
+    targetType: 'EmergencyReport',
+    targetId: result.deleted?.[0]?.reportId,
+    metadata: {
+      messageIds: result.deleted?.map((row) => row.messageId),
+      count: result.deleted?.length || 0,
+    },
+  };
+  return ApiResponse.success(res, result, 'Reports deleted');
 });
 
 export const getAuditLogs = asyncHandler(async (req, res) => {

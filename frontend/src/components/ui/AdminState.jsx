@@ -30,3 +30,19 @@ export const SeverityBadge = ({ severity }) => {
     </span>
   );
 };
+
+export const AlertKindBadge = ({ emergencyType }) => {
+  const sos = String(emergencyType || '').toLowerCase() === 'sos';
+  return (
+    <span
+      className={[
+        'inline-flex rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide',
+        sos
+          ? 'bg-red-100 text-red-800'
+          : 'bg-sky-100 text-sky-800',
+      ].join(' ')}
+    >
+      {sos ? 'SOS' : 'Broadcast'}
+    </span>
+  );
+};

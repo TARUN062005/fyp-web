@@ -124,7 +124,6 @@ const GatewayRadarMap = ({
 
         {gateway
           ? plotted.map(({ peer, position }) => {
-              if (peer.connectionState === 'DISCONNECTED') return null;
               return (
                 <Polyline
                   key={`link-${peer.peerId}`}

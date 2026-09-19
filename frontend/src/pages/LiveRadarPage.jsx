@@ -172,9 +172,9 @@ const LiveRadarPage = () => {
         <div>
           <h2 className="admin-page-title">Live Radar</h2>
           <p className="admin-page-sub">
-            Real OpenStreetMap view of the selected phone. Includes every node
-            this gateway sees on the mesh, plus radars from nearby phones that
-            also have internet. Distances use GPS when both have a fix.
+            Real OpenStreetMap view of the selected phone. Nearby people are
+            placed from this phone’s radar distances, not noisy GPS. Every
+            node this gateway publishes is shown.
           </p>
         </div>
         <p className="font-mono text-[11px] text-admin-muted">

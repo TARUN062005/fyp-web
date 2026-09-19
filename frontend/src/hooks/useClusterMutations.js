@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   clustersQueryKey,
+  deleteClusters,
   mergeClusters,
   verifyCluster,
 } from '../services/clusterService.js';
@@ -24,7 +25,6 @@ export const useVerifyCluster = () => {
   return useMutation({
     mutationFn: (clusterId) => verifyCluster(clusterId),
     onSuccess: (data) => {
-      // Immediate cache patch (socket also emits cluster:verified)
       patchAllClusterCaches(
         queryClient,
         AdminSocketEvents.CLUSTER_VERIFIED,
@@ -38,14 +38,32 @@ export const useMergeClusters = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ sourceClusterId, targetClusterId }) =>
-      mergeClusters({ sourceClusterId, targetClusterId }),
+    mutationFn: (input) => mergeClusters(input),
     onSuccess: (data) => {
       patchAllClusterCaches(
         queryClient,
         AdminSocketEvents.CLUSTER_MERGED,
         data
       );
+      queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
+    },
+  });
+};
+
+export const useDeleteClusters = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (clusterIds) => deleteClusters(clusterIds),
+    onSuccess: (data) => {
+      (data?.deleted || []).forEach((row) => {
+        patchAllClusterCaches(
+          queryClient,
+          AdminSocketEvents.CLUSTER_DELETED,
+          row
+        );
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
     },
   });
 };

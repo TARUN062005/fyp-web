@@ -71,26 +71,33 @@ const rankState = (state) => {
 };
 
 const preferPeer = (current, incoming) => {
-  if (!current) return incoming;
-  const gpsIn = incoming?.locationSource === 'GPS' && incoming?.location;
-  const gpsCur = current?.locationSource === 'GPS' && current?.location;
-  if (gpsIn && !gpsCur) return { ...current, ...incoming, location: incoming.location, locationSource: 'GPS' };
-  if (gpsCur && !gpsIn) {
-    return {
-      ...incoming,
-      ...current,
-      location: current.location,
-      locationSource: 'GPS',
-      connectionState:
-        rankState(incoming.connectionState) > rankState(current.connectionState)
-          ? incoming.connectionState
-          : current.connectionState,
-    };
-  }
-  if (rankState(incoming.connectionState) > rankState(current.connectionState)) {
-    return { ...current, ...incoming };
-  }
-  return current;
+  if (!incoming) return current;
+  const stripped = {
+    ...incoming,
+    location: undefined,
+    locationSource: undefined,
+  };
+  if (!current) return stripped;
+  const nextState =
+    rankState(incoming.connectionState) > rankState(current.connectionState)
+      ? incoming.connectionState
+      : current.connectionState;
+  const distance = Number.isFinite(Number(current.distanceMeters))
+    ? current.distanceMeters
+    : stripped.distanceMeters;
+  const angle = Number.isFinite(Number(current.angleDegrees))
+    ? current.angleDegrees
+    : stripped.angleDegrees;
+  return {
+    ...stripped,
+    ...current,
+    connectionState: nextState,
+    displayName: current.displayName || stripped.displayName,
+    distanceMeters: distance,
+    angleDegrees: angle,
+    location: undefined,
+    locationSource: undefined,
+  };
 };
 
 /**
@@ -139,17 +146,22 @@ export const mergeRadarSnapshots = (selected, others = []) => {
       progressed = true;
       ingestPeers(snap.peers);
       if (!peers.has(id)) {
+        const fromSelected = (selected.peers || []).find(
+          (p) => String(p.peerId) === id
+        );
         peers.set(id, {
           peerId: id,
-          displayName: snap.displayName || 'Gateway',
-          emergencyId: snap.emergencyId || null,
-          connectionState: 'CONNECTED',
-          distanceMeters: 0,
-          beyondRadarRange: false,
-          angleDegrees: 0,
+          displayName: snap.displayName || fromSelected?.displayName || 'Gateway',
+          emergencyId: snap.emergencyId || fromSelected?.emergencyId || null,
+          connectionState: fromSelected?.connectionState || 'CONNECTED',
+          distanceMeters: Number.isFinite(Number(fromSelected?.distanceMeters))
+            ? fromSelected.distanceMeters
+            : 0,
+          beyondRadarRange: Boolean(fromSelected?.beyondRadarRange),
+          angleDegrees: Number.isFinite(Number(fromSelected?.angleDegrees))
+            ? fromSelected.angleDegrees
+            : 0,
           lastSeen: snap.lastUpdatedAt || snap.capturedAt || null,
-          location: snap.observerLocation || null,
-          locationSource: snap.observerLocation ? 'GPS' : null,
         });
       }
       frontier.add(id);

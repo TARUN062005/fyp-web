@@ -21,18 +21,20 @@ describe('radarGeo', () => {
     expect(dest[0]).toBeCloseTo(6.00899, 4);
   });
 
-  it('prefers peer GPS over RSSI estimate', () => {
-    const resolved = resolvePeerLatLng(
-      {
-        location: { coordinates: [79.87, 6.93] },
-        locationSource: 'GPS',
-        distanceMeters: 40,
-        angleDegrees: 90,
-      },
-      [6.9271, 79.8612]
-    );
-    expect(resolved.source).toBe('GPS');
-    expect(resolved.position).toEqual([6.93, 79.87]);
+  it('places one-meter Nearby peers from RSSI not GPS', () => {
+    const gateway = [6.9271, 79.8612];
+    const peer = {
+      location: { coordinates: [79.8614, 6.9273] },
+      locationSource: 'GPS',
+      distanceMeters: 1,
+      angleDegrees: 0,
+    };
+    const resolved = resolvePeerLatLng(peer, gateway);
+    expect(resolved.source).toBe('ESTIMATED');
+    const distance = peerMapDistance(peer, gateway);
+    expect(distance.source).toBe('RSSI');
+    expect(distance.meters).toBe(1);
+    expect(formatDistanceLabel(distance)).toMatch(/1\.0 m/);
   });
 
   it('estimates around the gateway when GPS is missing', () => {
@@ -49,18 +51,17 @@ describe('radarGeo', () => {
     expect(formatCoord([6.9271234, 79.8612567])).toBe('6.927123, 79.861257');
   });
 
-  it('uses GPS haversine instead of the 20 m radar clamp', () => {
+  it('uses RSSI meters even when GPS is ~20 m away', () => {
     const gateway = [6.9271, 79.8612];
     const peer = {
       location: { coordinates: [79.86122, 6.92712] },
       locationSource: 'GPS',
-      distanceMeters: 80,
-      beyondRadarRange: true,
+      distanceMeters: 1,
+      beyondRadarRange: false,
     };
     const distance = peerMapDistance(peer, gateway);
-    expect(distance.source).toBe('GPS');
-    expect(distance.meters).toBeGreaterThan(0);
-    expect(distance.meters).toBeLessThan(10);
+    expect(distance.source).toBe('RSSI');
+    expect(distance.meters).toBe(1);
     expect(formatDistanceLabel(distance)).not.toMatch(/>20/);
   });
 });

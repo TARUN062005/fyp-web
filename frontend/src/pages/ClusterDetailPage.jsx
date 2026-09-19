@@ -3,12 +3,16 @@ import { Link, useParams } from 'react-router-dom';
 import { useClustersList } from '../hooks/useClusters.js';
 import { useClusterReports } from '../hooks/useClusterReports.js';
 import { useVerifyCluster } from '../hooks/useClusterMutations.js';
+import ClusterReportsTable from '../components/clusters/ClusterReportsTable.jsx';
 import ClusterTimeline from '../components/clusters/ClusterTimeline.jsx';
+import ReportDetailPanel from '../components/reports/ReportDetailPanel.jsx';
 import {
+  AlertKindBadge,
   ErrorAlert,
   LoadingNotice,
   SeverityBadge,
 } from '../components/ui/AdminState.jsx';
+import { isSosType } from '../utils/alertKind.js';
 
 /**
  * Full cluster detail (F5): summary + chronological timeline of the same
@@ -20,6 +24,9 @@ const ClusterDetailPage = () => {
   const reportsQuery = useClusterReports(clusterId, true);
   const verifyMutation = useVerifyCluster();
   const [actionError, setActionError] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const reports = reportsQuery.data?.reports || [];
+  const openReport = reports.find((r) => r.id === openId) || null;
 
   const cluster = (clusters || []).find(
     (c) => c.clusterId === clusterId || c.id === clusterId
@@ -56,6 +63,11 @@ const ClusterDetailPage = () => {
         <div>
           <h2 className="admin-page-title">Cluster detail</h2>
           <p className="admin-page-sub font-mono">{clusterId}</p>
+          {cluster ? (
+            <p className="mt-1">
+              <AlertKindBadge emergencyType={cluster.emergencyType} />
+            </p>
+          ) : null}
         </div>
         {cluster?.status === 'unverified' ? (
           <button
@@ -95,8 +107,14 @@ const ClusterDetailPage = () => {
           <dd>
             <SeverityBadge severity={cluster.severity} />
           </dd>
+          <dt className="text-admin-muted">Kind</dt>
+          <dd>
+            {isSosType(cluster.emergencyType)
+              ? 'Personal SOS'
+              : 'Broadcast alert'}
+          </dd>
           <dt className="text-admin-muted">Type</dt>
-          <dd>{cluster.emergencyType}</dd>
+          <dd className="capitalize">{cluster.emergencyType}</dd>
           <dt className="text-admin-muted">Status</dt>
           <dd className="font-mono uppercase">{cluster.status}</dd>
           <dt className="text-admin-muted">Reports</dt>
@@ -135,12 +153,43 @@ const ClusterDetailPage = () => {
           <div className="mt-3 border border-admin-line bg-admin-panel px-4 py-4 shadow-admin">
             <ClusterTimeline
               cluster={cluster}
-              reports={reportsQuery.data?.reports}
+              reports={reports}
               isLoading={reportsQuery.isLoading}
               isError={reportsQuery.isError}
               error={reportsQuery.error}
+              onSelectReport={(report) =>
+                setOpenId((id) => (id === report.id ? null : report.id))
+              }
+              selectedReportId={openId}
             />
           </div>
+          <h3 className="mt-8 text-sm font-semibold text-admin-ink">
+            Messages
+          </h3>
+          <p className="mt-1 text-xs text-admin-muted">
+            Click a row or timeline event to open sender, hops, votes, and
+            location.
+          </p>
+          <div className="mt-3 border border-admin-line bg-admin-panel shadow-admin">
+            <ClusterReportsTable
+              reports={reports}
+              isLoading={reportsQuery.isLoading}
+              isError={reportsQuery.isError}
+              error={reportsQuery.error}
+              onOpen={(report) =>
+                setOpenId((id) => (id === report.id ? null : report.id))
+              }
+              openId={openId}
+            />
+          </div>
+          {openReport ? (
+            <div className="mt-3">
+              <ReportDetailPanel
+                report={openReport}
+                onClose={() => setOpenId(null)}
+              />
+            </div>
+          ) : null}
         </>
       ) : null}
     </section>

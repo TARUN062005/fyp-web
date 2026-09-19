@@ -40,9 +40,27 @@ export const verifyClusterBodySchema = z.object({
   clusterId: z.string().min(1),
 });
 
-export const mergeClustersBodySchema = z.object({
-  sourceClusterId: z.string().min(1),
-  targetClusterId: z.string().min(1),
+export const mergeClustersBodySchema = z
+  .object({
+    clusterIds: z.array(z.string().min(1)).min(2).max(20).optional(),
+    sourceClusterId: z.string().min(1).optional(),
+    targetClusterId: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (Array.isArray(value.clusterIds) && value.clusterIds.length >= 2) return;
+    if (value.sourceClusterId && value.targetClusterId) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Provide clusterIds (2 or more) or sourceClusterId and targetClusterId',
+    });
+  });
+
+export const deleteClustersBodySchema = z.object({
+  clusterIds: z.array(z.string().min(1)).min(1).max(20),
+});
+
+export const deleteReportsBodySchema = z.object({
+  reportIds: z.array(z.string().min(1).max(128)).min(1).max(50),
 });
 
 export const deleteReportParamsSchema = z.object({

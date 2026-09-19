@@ -42,8 +42,16 @@ export const buildClusterTimelineEvents = (cluster, reports = []) => {
     events.push({
       id: `report-${report.id}`,
       kind: index === 0 ? 'first_report' : 'report',
+      reportId: report.id,
+      report,
       at: report.timestamp,
-      title: index === 0 ? 'First report' : 'Report received',
+      title: index === 0
+        ? (String(report.emergencyType || '').toLowerCase() === 'sos'
+          ? 'First SOS'
+          : 'First broadcast alert')
+        : (String(report.emergencyType || '').toLowerCase() === 'sos'
+          ? 'SOS received'
+          : 'Broadcast received'),
       severity,
       detail: report.messageId,
       meta: {
@@ -95,7 +103,15 @@ const kindLabel = {
   verified: '✓',
 };
 
-const ClusterTimeline = ({ cluster, reports, isLoading, isError, error }) => {
+const ClusterTimeline = ({
+  cluster,
+  reports,
+  isLoading,
+  isError,
+  error,
+  onSelectReport,
+  selectedReportId,
+}) => {
   const events = useMemo(
     () => buildClusterTimelineEvents(cluster, reports),
     [cluster, reports]
@@ -126,7 +142,19 @@ const ClusterTimeline = ({ cluster, reports, isLoading, isError, error }) => {
   return (
     <ol className="relative ms-2 border-l border-admin-line ps-6">
       {events.map((event) => (
-        <li key={event.id} className="relative pb-6 last:pb-0">
+        <li
+          key={event.id}
+          className={[
+            'relative pb-6 last:pb-0',
+            event.report && onSelectReport ? 'cursor-pointer rounded px-1 -mx-1' : '',
+            event.reportId && selectedReportId === event.reportId
+              ? 'bg-admin-accent-soft/40'
+              : '',
+          ].join(' ')}
+          onClick={() => {
+            if (event.report && onSelectReport) onSelectReport(event.report);
+          }}
+        >
           <span
             className={[
               'absolute -start-[1.55rem] top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 font-mono text-[9px] font-semibold text-admin-surface',

@@ -41,9 +41,13 @@ export const applyClustersSocketEvent = (clusters, event, payload) => {
 
     case AdminSocketEvents.CLUSTER_MERGED: {
       let next = upsertCluster(clusters, payload?.cluster);
-      if (payload?.mergedAwayClusterId) {
-        next = removeCluster(next, payload.mergedAwayClusterId);
-      }
+      const away = [
+        ...(payload?.mergedAwayClusterIds || []),
+        payload?.mergedAwayClusterId,
+      ].filter(Boolean);
+      away.forEach((id) => {
+        next = removeCluster(next, id);
+      });
       return next;
     }
 

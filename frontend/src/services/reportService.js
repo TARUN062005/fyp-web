@@ -108,3 +108,8 @@ export const deleteReport = async (reportId) => {
   const { data } = await api.delete(`/admin/reports/${id}`);
   return data.data;
 };
+
+export const deleteReports = async (reportIds) => {
+  const { data } = await api.post('/admin/delete-reports', { reportIds });
+  return data.data;
+};

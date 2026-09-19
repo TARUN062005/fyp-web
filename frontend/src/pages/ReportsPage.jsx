@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useReports } from '../hooks/useReports.js';
-import { useDeleteReport } from '../hooks/useReportMutations.js';
+import { useDeleteReport, useDeleteReports } from '../hooks/useReportMutations.js';
 import {
   buildReportParams,
   downloadBlob,
@@ -8,10 +8,13 @@ import {
 } from '../services/reportService.js';
 import { SEVERITY_LEVELS } from '../theme/severity.js';
 import {
+  AlertKindBadge,
   ErrorAlert,
   SeverityBadge,
 } from '../components/ui/AdminState.jsx';
 import ConfirmDeleteReportModal from '../components/reports/ConfirmDeleteReportModal.jsx';
+import ConfirmDeleteSelectionModal from '../components/reports/ConfirmDeleteSelectionModal.jsx';
+import ReportDetailPanel from '../components/reports/ReportDetailPanel.jsx';
 
 const emptyFilters = {
   severity: '',
@@ -68,9 +71,12 @@ const ReportsPage = () => {
   const [actionError, setActionError] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingBulk, setPendingBulk] = useState(false);
 
   const deleteMutation = useDeleteReport();
+  const bulkDeleteMutation = useDeleteReports();
 
   const queryFilters = useMemo(
     () => ({
@@ -158,7 +164,27 @@ const ReportsPage = () => {
       await deleteMutation.mutateAsync(report.id || report.messageId);
       setPendingDelete(null);
       if (selectedId === report.id) setSelectedId(null);
+      setSelectedIds((ids) => ids.filter((id) => id !== report.id));
       setActionMsg(`Deleted ${report.messageId}`);
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.error?.message ||
+          err?.message ||
+          'Delete failed'
+      );
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setActionError(null);
+    setActionMsg(null);
+    const ids = [...selectedIds];
+    try {
+      const result = await bulkDeleteMutation.mutateAsync(ids);
+      setPendingBulk(false);
+      setSelectedIds([]);
+      setSelectedId(null);
+      setActionMsg(`Deleted ${result?.deleted?.length || ids.length} reports`);
     } catch (err) {
       setActionError(
         err?.response?.data?.error?.message ||
@@ -174,7 +200,8 @@ const ReportsPage = () => {
         <div>
           <h2 className="admin-page-title">Reports</h2>
           <p className="admin-page-sub">
-            Raw relay uploads — filter, page, and export the same result set.
+            SOS and broadcast alerts, with full sender/hop detail when you
+            open a row. Filter, page, export, or delete a group.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -193,6 +220,14 @@ const ReportsPage = () => {
             className="admin-btn"
           >
             Export JSON
+          </button>
+          <button
+            type="button"
+            className="admin-btn-danger"
+            disabled={selectedIds.length === 0 || bulkDeleteMutation.isPending}
+            onClick={() => setPendingBulk(true)}
+          >
+            Delete selected ({selectedIds.length})
           </button>
         </div>
       </div>
@@ -325,6 +360,23 @@ const ReportsPage = () => {
         <table className="w-full min-w-[56rem] text-left text-sm">
           <thead>
             <tr className="border-b border-admin-line text-xs uppercase tracking-wide text-admin-muted">
+              <th className="px-3 py-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={
+                    reports.length > 0 &&
+                    reports.every((r) => selectedIds.includes(r.id))
+                  }
+                  onChange={() => {
+                    const ids = reports.map((r) => r.id);
+                    const allOn =
+                      ids.length > 0 && ids.every((id) => selectedIds.includes(id));
+                    setSelectedIds(allOn ? [] : ids);
+                  }}
+                  aria-label="Select all reports on this page"
+                />
+              </th>
+              <th className="px-3 py-2 font-medium">Kind</th>
               <th className="px-3 py-2 font-medium">Message</th>
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 font-medium">Severity</th>
@@ -340,7 +392,7 @@ const ReportsPage = () => {
           <tbody>
             {isLoading && !reports.length ? (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-admin-muted">
+                <td colSpan={12} className="px-3 py-6 text-admin-muted">
                   Loading reports…
                 </td>
               </tr>
@@ -348,7 +400,7 @@ const ReportsPage = () => {
 
             {!isLoading && !reports.length ? (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-admin-muted">
+                <td colSpan={12} className="px-3 py-6 text-admin-muted">
                   No reports match the current filters.
                 </td>
               </tr>
@@ -365,8 +417,28 @@ const ReportsPage = () => {
                   setSelectedId((id) => (id === r.id ? null : r.id))
                 }
               >
+                <td
+                  className="px-3 py-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(r.id)}
+                    onChange={() =>
+                      setSelectedIds((prev) =>
+                        prev.includes(r.id)
+                          ? prev.filter((id) => id !== r.id)
+                          : [...prev, r.id]
+                      )
+                    }
+                    aria-label={`Select ${r.messageId}`}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <AlertKindBadge emergencyType={r.emergencyType} />
+                </td>
                 <td className="px-3 py-2 font-mono text-xs">{r.messageId}</td>
-                <td className="px-3 py-2">{r.emergencyType}</td>
+                <td className="px-3 py-2 capitalize">{r.emergencyType}</td>
                 <td className="px-3 py-2">
                   <SeverityBadge severity={r.severity} />
                 </td>
@@ -413,93 +485,12 @@ const ReportsPage = () => {
       </div>
 
       {selected ? (
-        <div className="mt-4 rounded border border-admin-line bg-admin-panel p-4 text-sm shadow-admin">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-admin-muted">
-                Report audit
-              </p>
-              <h2 className="mt-1 font-mono text-sm font-semibold">
-                {selected.messageId}
-              </h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="admin-btn-danger"
-                onClick={() => setPendingDelete(selected)}
-              >
-                Delete
-              </button>
-              <button
-                type="button"
-                className="admin-btn"
-                onClick={() => setSelectedId(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs text-admin-muted">Who sent</dt>
-              <dd className="text-xs">
-                {personLabel(selected.originalSender, selected.originalSenderId)}
-                {selected.originalSender?.isVerified ? ' · verified' : ''}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">Received to website by</dt>
-              <dd className="text-xs">
-                {personLabel(selected.receivedBy, selected.uploaderId)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">All uploaders (no duplicate report)</dt>
-              <dd className="text-xs break-all">
-                {(selected.uploadersDetail || [])
-                  .map((u) => personLabel(u, u.id))
-                  .join(', ') ||
-                  (selected.uploaders || []).join(', ') ||
-                  '—'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">Counts</dt>
-              <dd className="font-mono text-xs">
-                uploads {selected.uploadCount ?? 1} · relays{' '}
-                {selected.relayCount ?? 0} · hops {selected.hopCount ?? 0}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">Verification</dt>
-              <dd className="text-xs">
-                {selected.verificationStatus || 'UNVERIFIED'} · confidence{' '}
-                {Math.round((selected.confidenceScore || 0) * 100)}%
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">Votes</dt>
-              <dd className="text-xs">
-                True {selected.trueVotes ?? 0} ({selected.truePercent ?? 0}%) ·
-                False {selected.falseVotes ?? 0} ({selected.falsePercent ?? 0}%) ·
-                Unknown {selected.unknownVotes ?? 0} (
-                {selected.unknownPercent ?? 0}%)
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">First / last upload</dt>
-              <dd className="font-mono text-xs">
-                {fmt(selected.firstUploadedAt)} → {fmt(selected.lastUploadedAt)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-admin-muted">Location</dt>
-              <dd className="font-mono text-xs">
-                {(selected.location?.coordinates || []).join(', ') || '—'}
-              </dd>
-            </div>
-          </dl>
+        <div className="mt-4">
+          <ReportDetailPanel
+            report={selected}
+            onClose={() => setSelectedId(null)}
+            onDelete={setPendingDelete}
+          />
         </div>
       ) : null}
 
@@ -509,8 +500,18 @@ const ReportsPage = () => {
         onCancel={() => setPendingDelete(null)}
         onConfirm={handleDelete}
       />
+      <ConfirmDeleteSelectionModal
+        open={pendingBulk}
+        title={`Delete ${selectedIds.length} report${selectedIds.length === 1 ? '' : 's'}?`}
+        body="This removes the selected cloud copies from the reports list and their clusters. Phones that already received the mesh message keep their local copy."
+        confirmLabel="Delete selected reports"
+        busy={bulkDeleteMutation.isPending}
+        onCancel={() => setPendingBulk(false)}
+        onConfirm={handleBulkDelete}
+      />
     </section>
   );
 };
 
 export default ReportsPage;
+

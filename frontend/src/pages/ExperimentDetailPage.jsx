@@ -24,6 +24,12 @@ const fmt = (value) => {
 const fmtMs = (value) =>
   value == null || !Number.isFinite(Number(value)) ? 'unavailable' : `${Math.round(value)} ms`;
 
+const destLabel = (trial) => {
+  if (trial.destinationDeviceId) return trial.destinationDeviceId;
+  if (trial.destinationMeshUserId) return trial.destinationMeshUserId.slice(0, 12);
+  return '—';
+};
+
 const pct = (value) =>
   value == null || !Number.isFinite(Number(value)) ? 'unavailable' : `${value}%`;
 
@@ -297,7 +303,7 @@ const ExperimentDetailPage = () => {
                   <td className="px-2 py-2 font-mono">{t.trialId.slice(0, 8)}</td>
                   <td className="px-2 py-2">{t.scenario}</td>
                   <td className="px-2 py-2 font-mono">{t.senderDeviceId || '—'}</td>
-                  <td className="px-2 py-2 font-mono">{t.destinationDeviceId || '—'}</td>
+                  <td className="px-2 py-2 font-mono">{destLabel(t)}</td>
                   <td className="px-2 py-2">{t.delivered ? 'yes' : 'no'}</td>
                   <td className="px-2 py-2">
                     {t.latencyReliable ? fmtMs(t.latencyMs) : 'unavailable'}

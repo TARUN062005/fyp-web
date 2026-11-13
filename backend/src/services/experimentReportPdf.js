@@ -220,7 +220,7 @@ export const buildExperimentPdfBuffer = (bundle) => {
             `latency=${t.latencyReliable ? fmtMs(t.latencyMs) : 'unavailable'}  ` +
             `dup=${t.duplicateCount}  fwd=${t.forwardingAttempts}  ` +
             `cloud=${t.cloudUploadStatus}  ack=${t.acknowledged}  ` +
-            `sender=${t.senderDeviceId || '—'}  dest=${t.destinationDeviceId || '—'}  ` +
+            `sender=${t.senderDeviceId || '—'}  dest=${t.destinationDeviceId || t.destinationMeshUserId || '—'}  ` +
             `fail=${t.failureReason || '—'}  ` +
             `origSender=${t.originalSenderDeviceId || '—'}  ` +
             `relayUploader=${t.cloudUploaderDeviceId || '—'}`

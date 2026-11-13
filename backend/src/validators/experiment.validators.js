@@ -62,7 +62,7 @@ const extraSchema = z
       if (FORBIDDEN_EVENT_KEYS.some((k) => lower.includes(k.toLowerCase()))) {
         continue;
       }
-      if (typeof value === 'string' && value.length > 200) continue;
+      if (typeof value === 'string' && value.length > 256) continue;
       cleaned[key] = value;
     }
     return Object.keys(cleaned).length ? cleaned : undefined;

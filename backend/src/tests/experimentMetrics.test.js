@@ -291,6 +291,71 @@ describe('experiment metrics', () => {
     assert.equal(trial.failureReason, 'destination_receipt_not_confirmed');
   });
 
+  it('counts RECEIVER-device receipts as destination delivery', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'MESSAGE_RECEIVED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        hopCount: 1,
+        wallClockMs: 1200,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events, [
+      { role: 'SENDER', deviceId: 'dev-a', meshUserId: 'mesh-a' },
+      { role: 'RECEIVER', deviceId: 'dev-b', meshUserId: 'mesh-b' },
+    ]);
+    assert.equal(trial.delivered, true);
+    assert.equal(trial.hopCount, 1);
+  });
+
+  it('merges receiver events into the sender trial by messageId', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        trialId: 'sender-trial',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+      }),
+      ev({
+        eventId: '2',
+        trialId: 'receiver-trial',
+        eventType: 'MESSAGE_RECEIVED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        hopCount: 1,
+        wallClockMs: 1300,
+      }),
+      ev({
+        eventId: '3',
+        trialId: 'receiver-trial',
+        eventType: 'MESSAGE_DELIVERED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        hopCount: 1,
+        wallClockMs: 1301,
+      }),
+    ];
+    const { summary, trials } = calculateExperimentResults(events, [
+      { role: 'RECEIVER', deviceId: 'dev-b', meshUserId: 'mesh-b' },
+    ]);
+    assert.equal(summary.successfulDeliveries, 1);
+    assert.equal(summary.failedTrialCount, 0);
+    assert.equal(trials.length, 1);
+    assert.equal(trials[0].delivered, true);
+  });
+
   it('returns null routing overhead when there are no successful deliveries', () => {
     const events = [
       ev({

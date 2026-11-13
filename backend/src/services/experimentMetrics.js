@@ -43,7 +43,7 @@ const isSenderEvent = (event, trialMeta) => {
   return false;
 };
 
-const isDestinationEvent = (event, trialMeta) => {
+const isDestinationEvent = (event, trialMeta, receiverIds = emptyReceiverIds()) => {
   if (!trialMeta) return false;
   if (event.eventType !== 'MESSAGE_RECEIVED' && event.eventType !== 'MESSAGE_DELIVERED') {
     return false;
@@ -58,6 +58,12 @@ const isDestinationEvent = (event, trialMeta) => {
   ) {
     return true;
   }
+  if (
+    (receiverIds.mesh.has(event.meshUserId) || receiverIds.device.has(event.deviceId)) &&
+    !isSenderEvent(event, trialMeta)
+  ) {
+    return true;
+  }
   // Destination paste was missing: a non-sender MESSAGE_DELIVERED is still a dest receipt.
   // Relays only emit MESSAGE_RECEIVED, so they do not count.
   if (
@@ -69,6 +75,19 @@ const isDestinationEvent = (event, trialMeta) => {
     return true;
   }
   return false;
+};
+
+const emptyReceiverIds = () => ({ mesh: new Set(), device: new Set() });
+
+const receiverIdsFromDevices = (devices = []) => {
+  const mesh = new Set();
+  const device = new Set();
+  for (const d of devices) {
+    if (d?.role !== 'RECEIVER') continue;
+    if (d.meshUserId) mesh.add(d.meshUserId);
+    if (d.deviceId) device.add(d.deviceId);
+  }
+  return { mesh, device };
 };
 
 const firstExtraValue = (events, key) => {
@@ -155,13 +174,14 @@ const computeLatency = (originEvent, destEvent) => {
   };
 };
 
-export const reconstructTrial = (trialId, events) => {
+export const reconstructTrial = (trialId, events, devices = []) => {
   const ordered = [...events].sort((a, b) => a.wallClockMs - b.wallClockMs);
   const meta = trialMetaFromEvents(ordered);
+  const receiverIds = receiverIdsFromDevices(devices);
   const origin = ordered.find((e) => e.eventType === 'MESSAGE_CREATED') ||
     ordered.find((e) => e.eventType === 'TRIAL_STARTED');
   const firstReceive = ordered.find((e) => e.eventType === 'MESSAGE_RECEIVED');
-  const destEvents = ordered.filter((e) => isDestinationEvent(e, meta));
+  const destEvents = ordered.filter((e) => isDestinationEvent(e, meta, receiverIds));
   const destReceive = destEvents[0] || null;
   const ack = ordered.find((e) => e.eventType === 'MESSAGE_ACKNOWLEDGED');
   const hopLimit = ordered.find((e) => e.eventType === 'HOP_LIMIT_REACHED');
@@ -295,15 +315,43 @@ export const metricsByScenario = (trials) => {
   return out;
 };
 
-export const calculateExperimentResults = (events) => {
+const mergeEventsByMessageId = (byTrial) => {
+  const createdOwners = new Map();
+  for (const [trialId, list] of byTrial.entries()) {
+    for (const event of list) {
+      if (event.eventType !== 'MESSAGE_CREATED' || !event.messageId) continue;
+      if (!createdOwners.has(event.messageId)) createdOwners.set(event.messageId, new Set());
+      createdOwners.get(event.messageId).add(trialId);
+    }
+  }
+  const uniqueHome = new Map();
+  for (const [messageId, owners] of createdOwners.entries()) {
+    if (owners.size === 1) uniqueHome.set(messageId, [...owners][0]);
+  }
+  for (const [trialId, list] of [...byTrial.entries()]) {
+    if (list.some((e) => e.eventType === 'MESSAGE_CREATED')) continue;
+    const homes = new Set(
+      list.map((e) => (e.messageId ? uniqueHome.get(e.messageId) : null)).filter(Boolean)
+    );
+    if (homes.size !== 1) continue;
+    const home = [...homes][0];
+    if (home === trialId) continue;
+    byTrial.get(home).push(...list);
+    byTrial.delete(trialId);
+  }
+  return byTrial;
+};
+
+export const calculateExperimentResults = (events, devices = []) => {
   const byTrial = new Map();
   for (const event of events) {
     if (!event.trialId) continue;
     if (!byTrial.has(event.trialId)) byTrial.set(event.trialId, []);
     byTrial.get(event.trialId).push(event);
   }
+  mergeEventsByMessageId(byTrial);
   const trials = [...byTrial.entries()].map(([trialId, list]) =>
-    reconstructTrial(trialId, list)
+    reconstructTrial(trialId, list, devices)
   );
   return {
     trials,

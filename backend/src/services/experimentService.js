@@ -143,7 +143,10 @@ export const listExperimentsForAdmin = async (query) => {
   }
 
   const enriched = items.map((item) => {
-    const result = calculateExperimentResults(eventsByExp.get(item.experimentId) || []);
+    const result = calculateExperimentResults(
+      eventsByExp.get(item.experimentId) || [],
+      devicesByExp.get(item.experimentId) || []
+    );
     return {
       ...item,
       participatingDevices: (devicesByExp.get(item.experimentId) || []).length,
@@ -325,7 +328,7 @@ export const loadExperimentBundle = async (experimentId) => {
     ExperimentEvent.find({ experimentId }).sort({ wallClockMs: 1 }).lean(),
     ExperimentUploadAudit.find({ experimentId }).sort({ createdAt: -1 }).limit(50).lean(),
   ]);
-  const calculated = calculateExperimentResults(events);
+  const calculated = calculateExperimentResults(events, devices);
   return {
     experiment: {
       ...experiment,

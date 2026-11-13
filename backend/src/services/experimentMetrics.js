@@ -30,14 +30,20 @@ const pct = (num, den) => {
   return roundOrNull((num / den) * 100, 2);
 };
 
+const normId = (value) =>
+  typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : '';
+
+const idsMatch = (a, b) => {
+  const left = normId(a);
+  const right = normId(b);
+  if (!left || !right) return false;
+  return left === right || left.startsWith(right) || right.startsWith(left);
+};
+
 const isSenderEvent = (event, trialMeta) => {
   if (!trialMeta) return false;
-  if (trialMeta.senderDeviceId && event.deviceId === trialMeta.senderDeviceId) return true;
-  if (
-    trialMeta.senderMeshUserId &&
-    event.meshUserId &&
-    event.meshUserId === trialMeta.senderMeshUserId
-  ) {
+  if (trialMeta.senderDeviceId && idsMatch(event.deviceId, trialMeta.senderDeviceId)) return true;
+  if (trialMeta.senderMeshUserId && idsMatch(event.meshUserId, trialMeta.senderMeshUserId)) {
     return true;
   }
   return false;
@@ -48,30 +54,21 @@ const isDestinationEvent = (event, trialMeta, receiverIds = emptyReceiverIds()) 
   if (event.eventType !== 'MESSAGE_RECEIVED' && event.eventType !== 'MESSAGE_DELIVERED') {
     return false;
   }
-  if (trialMeta.destinationDeviceId && event.deviceId === trialMeta.destinationDeviceId) {
+  if (isSenderEvent(event, trialMeta)) return false;
+  if (trialMeta.destinationDeviceId && idsMatch(event.deviceId, trialMeta.destinationDeviceId)) {
+    return true;
+  }
+  if (idsMatch(event.meshUserId, trialMeta.destinationMeshUserId)) {
     return true;
   }
   if (
-    trialMeta.destinationMeshUserId &&
-    event.meshUserId &&
-    event.meshUserId === trialMeta.destinationMeshUserId
+    receiverIds.mesh.has(normId(event.meshUserId)) ||
+    receiverIds.device.has(normId(event.deviceId))
   ) {
     return true;
   }
-  if (
-    (receiverIds.mesh.has(event.meshUserId) || receiverIds.device.has(event.deviceId)) &&
-    !isSenderEvent(event, trialMeta)
-  ) {
-    return true;
-  }
-  // Destination paste was missing: a non-sender MESSAGE_DELIVERED is still a dest receipt.
-  // Relays only emit MESSAGE_RECEIVED, so they do not count.
-  if (
-    event.eventType === 'MESSAGE_DELIVERED' &&
-    !trialMeta.destinationDeviceId &&
-    !trialMeta.destinationMeshUserId &&
-    !isSenderEvent(event, trialMeta)
-  ) {
+  // Receiver phones emit MESSAGE_DELIVERED. Relays only emit MESSAGE_RECEIVED.
+  if (event.eventType === 'MESSAGE_DELIVERED') {
     return true;
   }
   return false;
@@ -84,8 +81,10 @@ const receiverIdsFromDevices = (devices = []) => {
   const device = new Set();
   for (const d of devices) {
     if (d?.role !== 'RECEIVER') continue;
-    if (d.meshUserId) mesh.add(d.meshUserId);
-    if (d.deviceId) device.add(d.deviceId);
+    const meshId = normId(d.meshUserId);
+    const deviceId = normId(d.deviceId);
+    if (meshId) mesh.add(meshId);
+    if (deviceId) device.add(deviceId);
   }
   return { mesh, device };
 };

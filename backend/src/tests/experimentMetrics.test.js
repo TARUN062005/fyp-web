@@ -291,6 +291,33 @@ describe('experiment metrics', () => {
     assert.equal(trial.failureReason, 'destination_receipt_not_confirmed');
   });
 
+  it('counts non-sender MESSAGE_DELIVERED even when destination mesh was pasted', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+        extra: { destinationMeshUserId: 'mesh-b' },
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'MESSAGE_DELIVERED',
+        deviceId: 'dev-b',
+        meshUserId: '',
+        hopCount: 1,
+        wallClockMs: 1400,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events, [
+      { role: 'RECEIVER', deviceId: 'dev-b', meshUserId: 'mesh-b' },
+    ]);
+    assert.equal(trial.delivered, true);
+    assert.equal(trial.hopCount, 1);
+  });
+
   it('counts RECEIVER-device receipts as destination delivery', () => {
     const events = [
       ev({

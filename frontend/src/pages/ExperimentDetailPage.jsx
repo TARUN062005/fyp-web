@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  deleteExperiment,
   downloadExperimentPdf,
   experimentDetailQueryKey,
   experimentTrialsQueryKey,
   fetchExperiment,
   fetchExperimentTrials,
 } from '../services/experimentService.js';
+import ConfirmDeleteExperimentModal from '../components/experiments/ConfirmDeleteExperimentModal.jsx';
 import {
   EmptyNotice,
   ErrorAlert,
@@ -55,10 +57,14 @@ const BarChart = ({ title, rows }) => {
 
 const ExperimentDetailPage = () => {
   const { experimentId } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [scenario, setScenario] = useState('');
   const [delivered, setDelivered] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
 
   const detailQuery = useQuery({
     queryKey: experimentDetailQueryKey(experimentId),
@@ -93,6 +99,18 @@ const ExperimentDetailPage = () => {
     label,
     ...s,
   }));
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteExperiment(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'experiments'] });
+      navigate('/experiments');
+    },
+    onError: (err) => {
+      setDeleteError(err);
+      setPendingDelete(null);
+    },
+  });
 
   const onDownload = async () => {
     setDownloading(true);
@@ -129,16 +147,29 @@ const ExperimentDetailPage = () => {
             {experiment.measurementKind || 'PHYSICAL_ANDROID'} · not simulation
           </p>
         </div>
-        <button
-          type="button"
-          className="border border-admin-line bg-admin-panel px-3 py-2 text-sm font-medium"
-          onClick={onDownload}
-          disabled={downloading}
-        >
-          {downloading ? 'Preparing PDF…' : 'Download PDF Report'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="border border-admin-line bg-admin-panel px-3 py-2 text-sm font-medium"
+            onClick={onDownload}
+            disabled={downloading}
+          >
+            {downloading ? 'Preparing PDF…' : 'Download PDF Report'}
+          </button>
+          <button
+            type="button"
+            className="admin-btn-danger px-3 py-2 text-sm font-medium"
+            onClick={() => {
+              setDeleteError(null);
+              setPendingDelete(experiment);
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
       {downloadError ? <ErrorAlert error={downloadError} /> : null}
+      {deleteError ? <ErrorAlert error={deleteError} /> : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <Metric label="Delivery ratio" value={pct(summary.deliveryRatio)} />
@@ -282,6 +313,13 @@ const ExperimentDetailPage = () => {
           </table>
         </div>
       )}
+
+      <ConfirmDeleteExperimentModal
+        experiment={pendingDelete}
+        busy={deleteMutation.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={(item) => deleteMutation.mutate(item.experimentId)}
+      />
     </section>
   );
 };

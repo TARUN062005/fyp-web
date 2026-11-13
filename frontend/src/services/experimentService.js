@@ -31,6 +31,13 @@ export const fetchExperimentTrials = async (experimentId, params = {}) => {
   return data.data;
 };
 
+export const deleteExperiment = async (experimentId) => {
+  const { data } = await api.delete(
+    `/admin/experiments/${encodeURIComponent(experimentId)}`
+  );
+  return data.data;
+};
+
 export const downloadExperimentPdf = async (experimentId) => {
   const res = await api.get(
     `/admin/experiments/${encodeURIComponent(experimentId)}/report`,

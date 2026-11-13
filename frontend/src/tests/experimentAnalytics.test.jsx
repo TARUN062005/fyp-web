@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ExperimentAnalyticsPage from '../pages/ExperimentAnalyticsPage.jsx';
@@ -28,6 +28,7 @@ vi.mock('../services/experimentService.js', () => ({
   fetchExperiment: vi.fn(),
   fetchExperimentTrials: vi.fn(),
   downloadExperimentPdf: vi.fn(),
+  deleteExperiment: vi.fn(),
 }));
 
 import {
@@ -148,8 +149,11 @@ describe('Experiment Analytics', () => {
     );
     expect(await screen.findByText('Lab run')).toBeTruthy();
     expect(screen.getByText('Download PDF Report')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeTruthy();
     expect(screen.getByText('PHYSICAL_ANDROID · not simulation')).toBeTruthy();
     expect(screen.getByText('100%')).toBeTruthy();
     expect(screen.queryByText('secret hello')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(screen.getByRole('dialog', { name: /delete this experiment/i })).toBeTruthy();
   });
 });

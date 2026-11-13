@@ -40,18 +40,32 @@ const left = () => doc.page.margins.left;
 const contentWidth = () =>
   doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
+const resetFlow = (y) => {
+  doc.x = left();
+  if (typeof y === 'number') doc.y = y;
+};
+
 const ensureSpace = (h) => {
   if (doc.y + h > doc.page.height - doc.page.margins.bottom) {
     doc.addPage();
+    resetFlow(doc.page.margins.top);
   }
+};
+
+const fullText = (t, opts = {}) => {
+  resetFlow();
+  doc.text(t, left(), doc.y, {
+    width: contentWidth(),
+    align: opts.align || 'left',
+    lineGap: opts.lineGap ?? 4,
+  });
 };
 
 const h1 = (t) => {
   ensureSpace(40);
   doc.moveDown(0.15);
-  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLORS.ink).text(t, {
-    lineGap: 3,
-  });
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLORS.ink);
+  fullText(t, { lineGap: 3 });
   doc
     .moveTo(left(), doc.y + 4)
     .lineTo(left() + contentWidth(), doc.y + 4)
@@ -59,46 +73,44 @@ const h1 = (t) => {
     .lineWidth(2)
     .stroke();
   doc.moveDown(0.7);
+  resetFlow();
 };
 
 const h2 = (t) => {
   ensureSpace(30);
   doc.moveDown(0.2);
-  doc.font('Helvetica-Bold').fontSize(13).fillColor(COLORS.blue).text(t, {
-    lineGap: 2,
-  });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(COLORS.blue);
+  fullText(t, { lineGap: 2 });
   doc.moveDown(0.25);
+  resetFlow();
 };
 
 const para = (t) => {
-  doc
-    .font('Helvetica')
-    .fontSize(12)
-    .fillColor(COLORS.ink)
-    .text(t, { align: 'left', lineGap: 4 });
+  resetFlow();
+  doc.font('Helvetica').fontSize(12).fillColor(COLORS.ink);
+  fullText(t, { lineGap: 4 });
   doc.moveDown(0.35);
+  resetFlow();
 };
 
 const step = (n, t) => {
-  ensureSpace(24);
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.ink).text(`${n}.  `, {
-    continued: true,
-  });
-  doc.font('Helvetica').text(t, { lineGap: 3 });
+  ensureSpace(28);
+  resetFlow();
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.ink);
+  fullText(`${n}.  ${t}`, { lineGap: 3 });
   doc.moveDown(0.12);
-};
-
-const typeValue = (label, value) => {
-  ensureSpace(22);
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.ink).text(`${label}: `, {
-    continued: true,
-  });
-  doc.font('Courier-Bold').fillColor(COLORS.red).text(value);
+  resetFlow();
 };
 
 const callout = (title, lines) => {
-  const lineH = 18;
-  const h = 28 + lines.length * lineH;
+  const innerW = contentWidth() - 20;
+  doc.font('Helvetica-Bold').fontSize(12);
+  const titleH = doc.heightOfString(title, { width: innerW, lineGap: 2 }) + 4;
+  doc.font('Helvetica').fontSize(12);
+  const lineHeights = lines.map(
+    (line) => doc.heightOfString(line, { width: innerW, lineGap: 2 }) + 4
+  );
+  const h = 16 + titleH + lineHeights.reduce((a, b) => a + b, 0) + 10;
   ensureSpace(h + 8);
   const x = left();
   const y = doc.y;
@@ -107,17 +119,17 @@ const callout = (title, lines) => {
     .font('Helvetica-Bold')
     .fontSize(12)
     .fillColor(COLORS.blue)
-    .text(title, x + 10, y + 8, { width: contentWidth() - 20 });
-  let ty = y + 28;
-  lines.forEach((line) => {
+    .text(title, x + 10, y + 8, { width: innerW, lineGap: 2 });
+  let ty = y + 12 + titleH;
+  lines.forEach((line, i) => {
     doc
       .font('Helvetica')
       .fontSize(12)
       .fillColor(COLORS.ink)
-      .text(line, x + 10, ty, { width: contentWidth() - 20, lineGap: 2 });
-    ty += lineH;
+      .text(line, x + 10, ty, { width: innerW, lineGap: 2 });
+    ty += lineHeights[i];
   });
-  doc.y = y + h + 10;
+  resetFlow(y + h + 10);
 };
 
 const fieldTable = (headers, rows) => {
@@ -148,14 +160,11 @@ const fieldTable = (headers, rows) => {
 
   rows.forEach((row, idx) => {
     const heights = row.map((cell, i) => {
-      const font = i === 1 ? 'Courier-Bold' : 'Helvetica';
-      const size = i === 1 ? 11 : 11;
+      doc.font(i === 1 ? 'Courier-Bold' : 'Helvetica').fontSize(11);
       return Math.max(
         rowMin,
         doc.heightOfString(String(cell), {
           width: colW[i] - pad * 2,
-          font,
-          size,
           lineGap: 2,
         }) + 12
       );
@@ -163,6 +172,7 @@ const fieldTable = (headers, rows) => {
     const h = Math.max(...heights);
     if (y + h > doc.page.height - doc.page.margins.bottom) {
       doc.addPage();
+      resetFlow(doc.page.margins.top);
       y = drawHeader(doc.y);
     }
     doc
@@ -199,7 +209,7 @@ const fieldTable = (headers, rows) => {
     });
     y += h;
   });
-  doc.y = y + 10;
+  resetFlow(y + 10);
 };
 
 const chip = (label, on, x, y) => {
@@ -236,14 +246,12 @@ const radios = (opts) => {
   chip('Wi-Fi', opts.wifi, x + 210, y + 32);
   chip('Internet', opts.net, x + 310, y + 32);
   chip('Mobile data', opts.data ?? opts.net, x + 410, y + 32);
-  doc.y = y + 74;
+  resetFlow(y + 74);
   if (opts.note) {
-    doc
-      .font('Helvetica')
-      .fontSize(11)
-      .fillColor(COLORS.muted)
-      .text(opts.note, { lineGap: 3 });
+    doc.font('Helvetica').fontSize(11).fillColor(COLORS.muted);
+    fullText(opts.note, { lineGap: 3 });
     doc.moveDown(0.25);
+    resetFlow();
   }
 };
 
@@ -283,7 +291,7 @@ const phoneRow = (phones) => {
     }
     x += boxW + gap;
   });
-  doc.y = y + 62;
+  resetFlow(y + 62);
 };
 
 const footer = () => {
@@ -312,16 +320,13 @@ const footer = () => {
 // ---------------------------------------------------------------------------
 // COVER + APP MAP
 // ---------------------------------------------------------------------------
-doc.font('Helvetica-Bold').fontSize(22).fillColor(COLORS.ink).text(
-  'EmergencyDTN pin-to-pin test guide'
-);
+doc.font('Helvetica-Bold').fontSize(22).fillColor(COLORS.ink);
+fullText('EmergencyDTN pin-to-pin test guide', { lineGap: 3 });
 doc.moveDown(0.3);
-doc
-  .font('Helvetica')
-  .fontSize(13)
-  .fillColor(COLORS.muted)
-  .text('Exact screen names, field labels, and values to type for all 7 tests.');
+doc.font('Helvetica').fontSize(13).fillColor(COLORS.muted);
+fullText('Exact screen names, field labels, and values to type for all 7 tests.');
 doc.moveDown(0.8);
+resetFlow();
 
 callout('How to read this PDF', [
   'Yellow boxes = type this text exactly (copy it, do not invent your own).',
@@ -356,7 +361,7 @@ h2('Copy the receiver User ID (needed on every test)');
 step(1, 'On the RECEIVER phone only, tap Settings.');
 step(2, 'On the Profile card, find the row labelled User ID.');
 step(3, 'Long-press that long hex string and Copy.');
-step(4, 'That same value is also shown later as Mesh user ID on Experiment Testing → Device Information.');
+step(4, 'That same value is also shown later as Mesh user ID on Experiment Testing  >  Device Information.');
 para(
   'Paste it later into Destination mesh user ID on the SENDER phone. Relays must leave that field empty or unused.'
 );
@@ -465,7 +470,7 @@ step(2, 'Turn Bluetooth ON.');
 step(3, 'Turn Location ON. Allow Nearby / location permission when the app asks.');
 step(4, 'Turn Wi-Fi ON, or turn on a mobile hotspot. Nearby needs Wi-Fi or hotspot even with no internet.');
 step(5, 'Keep the app open in the foreground on every phone.');
-step(6, 'Confirm the other phone appears under Chat → Start chat with selected node → Currently Online before you start a trial.');
+step(6, 'Confirm the other phone appears under Chat  >  Start chat with selected node  >  Currently Online before you start a trial.');
 para(
   'If Currently Online is empty, do not start the trial. Stay on the same room, unlock both screens, and wait until the name appears.'
 );
@@ -512,8 +517,8 @@ fieldTable(
 );
 
 h2('Copy destination, then start trial, then send');
-step(1, 'On Phone B: Settings → Profile → copy User ID.');
-step(2, 'On Phone A: Experiment Testing → Run a trial → paste into Destination mesh user ID.');
+step(1, 'On Phone B: Settings  >  Profile  >  copy User ID.');
+step(2, 'On Phone A: Experiment Testing  >  Run a trial  >  paste into Destination mesh user ID.');
 step(3, 'On Phone A tap Start trial. Wait until the screen shows a running trial.');
 step(4, 'On Phone A tap bottom tab Alerts (screen title becomes Broadcast).');
 step(5, 'Scroll to New broadcast and fill the composer exactly as below.');
@@ -630,10 +635,10 @@ fieldTable(
 );
 
 h2('Trial + broadcast to send');
-step(1, 'Copy Phone C Settings → Profile → User ID.');
+step(1, 'Copy Phone C Settings  >  Profile  >  User ID.');
 step(2, 'On Phone A paste it into Destination mesh user ID. Do not paste Phone B.');
 step(3, 'On Phone A tap Start trial.');
-step(4, 'On Phone A: Alerts → New broadcast, then fill:');
+step(4, 'On Phone A: Alerts  >  New broadcast, then fill:');
 
 fieldTable(
   ['Broadcast field', 'Type / tap this exact value', 'Must be'],
@@ -686,7 +691,7 @@ fieldTable(
 
 step(1, 'Destination mesh user ID = Phone D User ID only.');
 step(2, 'Phone A tap Start trial.');
-step(3, 'Phone A Alerts → New broadcast:');
+step(3, 'Phone A Alerts  >  New broadcast:');
 
 fieldTable(
   ['Broadcast field', 'Type / tap this exact value', 'Must be'],
@@ -730,7 +735,7 @@ fieldTable(
 
 step(1, 'Destination mesh user ID = Phone C User ID.');
 step(2, 'Phone A tap Start trial.');
-step(3, 'Phone A Alerts → New broadcast:');
+step(3, 'Phone A Alerts  >  New broadcast:');
 
 fieldTable(
   ['Broadcast field', 'Type / tap this exact value', 'Must be'],
@@ -847,7 +852,7 @@ step(3, 'Do not send EXP-T7-HOPS in that case.');
 
 doc.addPage();
 h1('6. After every test — same 4 taps');
-step(1, 'Open Experiment Testing again (Settings → Open Experiment Testing).');
+step(1, 'Open Experiment Testing again (Settings  >  Open Experiment Testing).');
 step(2, 'On View Experiment Results, confirm a trial row exists. Failed is still valid. Do not delete it.');
 step(3, 'If Running trial is still showing after 1–2 minutes, tap Stop trial (keep as failed).');
 step(4, 'Turn internet ON, then tap Upload now. Watch Pending go down.');
@@ -873,13 +878,13 @@ h1('8. Quick copy sheet — every message to type');
 fieldTable(
   ['Test', 'Type this exact text', 'Where you type it'],
   [
-    ['1 Direct Broadcast', 'EXP-T1-DIRECT', 'Alerts → New broadcast message box'],
-    ['2 Private Chat', 'EXP-T2-CHAT', 'Chat → Type a message box'],
-    ['3 Three-Phone Line', 'EXP-T3-LINE', 'Alerts → New broadcast message box'],
-    ['4 Four-Phone Line', 'EXP-T4-LINE', 'Alerts → New broadcast message box'],
-    ['5 Duplicate Suppression', 'EXP-T5-DUP', 'Alerts → New broadcast message box'],
-    ['6 Cloud relay SOS', '(do not type)', 'SOS tab → tap SOS; app sends distress'],
-    ['7 Hop Limit', 'EXP-T7-HOPS', 'Alerts → New broadcast, or Skip this scenario'],
+    ['1 Direct Broadcast', 'EXP-T1-DIRECT', 'Alerts  >  New broadcast message box'],
+    ['2 Private Chat', 'EXP-T2-CHAT', 'Chat  >  Type a message box'],
+    ['3 Three-Phone Line', 'EXP-T3-LINE', 'Alerts  >  New broadcast message box'],
+    ['4 Four-Phone Line', 'EXP-T4-LINE', 'Alerts  >  New broadcast message box'],
+    ['5 Duplicate Suppression', 'EXP-T5-DUP', 'Alerts  >  New broadcast message box'],
+    ['6 Cloud relay SOS', '(do not type)', 'SOS tab  >  tap SOS; app sends distress'],
+    ['7 Hop Limit', 'EXP-T7-HOPS', 'Alerts  >  New broadcast, or Skip this scenario'],
   ]
 );
 

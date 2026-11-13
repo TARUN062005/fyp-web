@@ -233,6 +233,64 @@ describe('experiment metrics', () => {
     assert.equal(summary.routingOverhead, 2);
   });
 
+  it('counts non-sender MESSAGE_DELIVERED when destination ids were not uploaded', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        eventType: 'TRIAL_STARTED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+        extra: {},
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1010,
+      }),
+      ev({
+        eventId: '3',
+        eventType: 'MESSAGE_DELIVERED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        hopCount: 1,
+        wallClockMs: 1200,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events);
+    assert.equal(trial.delivered, true);
+    assert.equal(trial.failureReason, null);
+    assert.equal(trial.hopCount, 1);
+  });
+
+  it('does not treat sender MESSAGE_DELIVERED as destination receipt', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'MESSAGE_DELIVERED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1300,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events);
+    assert.equal(trial.delivered, false);
+    assert.equal(trial.failureReason, 'destination_receipt_not_confirmed');
+  });
+
   it('returns null routing overhead when there are no successful deliveries', () => {
     const events = [
       ev({

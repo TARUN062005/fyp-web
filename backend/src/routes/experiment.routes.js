@@ -21,6 +21,7 @@ import {
   postExperimentEventsBatch,
   getExperimentResults,
   getExperimentTrials,
+  deleteExperiment,
 } from '../controllers/experiment.controller.js';
 
 const router = Router();
@@ -83,6 +84,11 @@ router.get(
     query: trialListQuerySchema,
   }),
   getExperimentTrials
+);
+router.delete(
+  '/:experimentId',
+  validateRequest({ params: experimentIdParamsSchema }),
+  deleteExperiment
 );
 
 export default router;

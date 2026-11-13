@@ -30,6 +30,19 @@ const pct = (num, den) => {
   return roundOrNull((num / den) * 100, 2);
 };
 
+const isSenderEvent = (event, trialMeta) => {
+  if (!trialMeta) return false;
+  if (trialMeta.senderDeviceId && event.deviceId === trialMeta.senderDeviceId) return true;
+  if (
+    trialMeta.senderMeshUserId &&
+    event.meshUserId &&
+    event.meshUserId === trialMeta.senderMeshUserId
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const isDestinationEvent = (event, trialMeta) => {
   if (!trialMeta) return false;
   if (event.eventType !== 'MESSAGE_RECEIVED' && event.eventType !== 'MESSAGE_DELIVERED') {
@@ -45,10 +58,25 @@ const isDestinationEvent = (event, trialMeta) => {
   ) {
     return true;
   }
-  if (event.eventType === 'MESSAGE_DELIVERED' && trialMeta.destinationDeviceId) {
-    return event.deviceId === trialMeta.destinationDeviceId;
+  // Destination paste was missing: a non-sender MESSAGE_DELIVERED is still a dest receipt.
+  // Relays only emit MESSAGE_RECEIVED, so they do not count.
+  if (
+    event.eventType === 'MESSAGE_DELIVERED' &&
+    !trialMeta.destinationDeviceId &&
+    !trialMeta.destinationMeshUserId &&
+    !isSenderEvent(event, trialMeta)
+  ) {
+    return true;
   }
   return false;
+};
+
+const firstExtraValue = (events, key) => {
+  for (const event of events) {
+    const value = event?.extra?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
 };
 
 const trialMetaFromEvents = (events) => {
@@ -57,9 +85,13 @@ const trialMetaFromEvents = (events) => {
   const seed = started || created || events[0];
   return {
     senderDeviceId: seed?.sourceDeviceId || seed?.deviceId || null,
-    destinationDeviceId: seed?.destinationDeviceId || null,
-    destinationMeshUserId: seed?.extra?.destinationMeshUserId || null,
-    senderMeshUserId: seed?.meshUserId || seed?.extra?.senderMeshUserId || null,
+    destinationDeviceId:
+      seed?.destinationDeviceId ||
+      events.find((e) => e.destinationDeviceId)?.destinationDeviceId ||
+      null,
+    destinationMeshUserId: firstExtraValue(events, 'destinationMeshUserId'),
+    senderMeshUserId:
+      seed?.meshUserId || firstExtraValue(events, 'senderMeshUserId') || null,
     scenario: seed?.scenario || null,
     messageId: created?.messageId || events.find((e) => e.messageId)?.messageId || null,
     skipped: events.some((e) => e.eventType === 'TRIAL_SKIPPED'),

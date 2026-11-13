@@ -31,4 +31,11 @@ describe('experiment API auth', () => {
     const res = await request(app).get('/admin/experiments/exp-1/report');
     assert.equal(res.status, 401);
   });
+
+  it('rejects unauthenticated admin experiment delete', async () => {
+    const res = await request(app).delete(
+      '/admin/experiments/11111111-2222-3333-4444-555555555555'
+    );
+    assert.equal(res.status, 401);
+  });
 });

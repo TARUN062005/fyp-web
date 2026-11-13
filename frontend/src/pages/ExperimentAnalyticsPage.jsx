@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  deleteExperiment,
   experimentsQueryKey,
   fetchExperiments,
 } from '../services/experimentService.js';
+import ConfirmDeleteExperimentModal from '../components/experiments/ConfirmDeleteExperimentModal.jsx';
 import {
   EmptyNotice,
   ErrorAlert,
@@ -23,8 +25,11 @@ const fmt = (value) => {
 const pct = (value) => (value == null ? 'unavailable' : `${value}%`);
 
 const ExperimentAnalyticsPage = () => {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
   const [scenario, setScenario] = useState('');
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
   const params = useMemo(
     () => ({
       page: 1,
@@ -41,6 +46,17 @@ const ExperimentAnalyticsPage = () => {
   });
 
   const items = query.data?.items || [];
+  const deleteMutation = useMutation({
+    mutationFn: (experimentId) => deleteExperiment(experimentId),
+    onSuccess: async () => {
+      setPendingDelete(null);
+      setDeleteError(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'experiments'] });
+    },
+    onError: (err) => {
+      setDeleteError(err);
+    },
+  });
 
   return (
     <section>
@@ -89,6 +105,7 @@ const ExperimentAnalyticsPage = () => {
 
       {query.isLoading ? <LoadingNotice>Loading experiments…</LoadingNotice> : null}
       {query.isError ? <ErrorAlert error={query.error} /> : null}
+      {deleteError ? <ErrorAlert error={deleteError} /> : null}
       {!query.isLoading && !items.length ? (
         <EmptyNotice>
           No physical-device experiments uploaded yet. Create an experiment in the
@@ -110,6 +127,7 @@ const ExperimentAnalyticsPage = () => {
                 <th className="px-3 py-2">Delivery</th>
                 <th className="px-3 py-2">Date</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -137,12 +155,31 @@ const ExperimentAnalyticsPage = () => {
                   <td className="px-3 py-2">{pct(item.deliveryRatio)}</td>
                   <td className="px-3 py-2">{fmt(item.startedAt || item.createdAt)}</td>
                   <td className="px-3 py-2">{item.status}</td>
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      className="admin-btn-danger px-2 py-1 text-xs"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setPendingDelete(item);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : null}
+
+      <ConfirmDeleteExperimentModal
+        experiment={pendingDelete}
+        busy={deleteMutation.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={(item) => deleteMutation.mutate(item.experimentId)}
+      />
     </section>
   );
 };

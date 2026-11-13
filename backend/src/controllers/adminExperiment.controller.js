@@ -4,6 +4,7 @@ import {
   listExperimentsForAdmin,
   loadExperimentBundle,
   paginateTrials,
+  deleteExperimentBundle,
 } from '../services/experimentService.js';
 import {
   buildExperimentPdfBuffer,
@@ -61,4 +62,9 @@ export const adminGetExperimentReport = asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   return res.status(200).send(pdf);
+});
+
+export const adminDeleteExperiment = asyncHandler(async (req, res) => {
+  const result = await deleteExperimentBundle(req.params.experimentId);
+  return ApiResponse.success(res, result, 'Experiment deleted');
 });

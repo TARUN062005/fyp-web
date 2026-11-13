@@ -10,6 +10,7 @@ import {
   ingestEventBatch,
   loadExperimentBundle,
   paginateTrials,
+  deleteExperimentForUser,
 } from '../services/experimentService.js';
 
 export const postExperiment = asyncHandler(async (req, res) => {
@@ -83,4 +84,12 @@ export const getExperimentTrials = asyncHandler(async (req, res) => {
   const bundle = await loadExperimentBundle(req.params.experimentId);
   const page = paginateTrials(bundle.trials, req.query);
   return ApiResponse.success(res, page, 'Experiment trials');
+});
+
+export const deleteExperiment = asyncHandler(async (req, res) => {
+  const result = await deleteExperimentForUser(
+    req.user.userId,
+    req.params.experimentId
+  );
+  return ApiResponse.success(res, result, 'Experiment deleted');
 });

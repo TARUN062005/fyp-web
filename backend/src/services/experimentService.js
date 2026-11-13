@@ -171,6 +171,30 @@ export const getExperimentForAdmin = async (experimentId) => {
   return experiment;
 };
 
+export const deleteExperimentBundle = async (experimentId) => {
+  const experiment = await Experiment.findOne({ experimentId });
+  if (!experiment) throw httpError(404, 'Experiment not found');
+  await Promise.all([
+    ExperimentEvent.deleteMany({ experimentId }),
+    ExperimentDevice.deleteMany({ experimentId }),
+    ExperimentUploadAudit.deleteMany({ experimentId }),
+  ]);
+  await Experiment.deleteOne({ experimentId });
+  return { experimentId, deleted: true };
+};
+
+export const deleteExperimentForUser = async (userId, experimentId) => {
+  const { experiment, allowed, asOwner } = await userCanAccessExperiment(
+    userId,
+    experimentId
+  );
+  if (!experiment) throw httpError(404, 'Experiment not found');
+  if (!allowed || !asOwner) {
+    throw httpError(403, 'Only the experiment owner can delete this experiment');
+  }
+  return deleteExperimentBundle(experimentId);
+};
+
 export const updateExperimentStatus = async (userId, experimentId, status) => {
   const { experiment, allowed, asOwner } = await userCanAccessExperiment(
     userId,

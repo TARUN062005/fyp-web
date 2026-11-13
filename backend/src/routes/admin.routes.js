@@ -60,6 +60,7 @@ import {
   adminGetExperimentTrials,
   adminGetExperimentEvents,
   adminGetExperimentReport,
+  adminDeleteExperiment,
 } from '../controllers/adminExperiment.controller.js';
 
 const router = Router();
@@ -242,6 +243,12 @@ router.get(
   ...adminGuard,
   validateRequest({ params: experimentIdParamsSchema }),
   adminGetExperiment
+);
+router.delete(
+  '/experiments/:experimentId',
+  ...adminGuard,
+  validateRequest({ params: experimentIdParamsSchema }),
+  adminDeleteExperiment
 );
 
 export default router;

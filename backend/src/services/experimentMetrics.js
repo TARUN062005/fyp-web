@@ -36,15 +36,16 @@ const normId = (value) =>
 const idsMatch = (a, b) => {
   const left = normId(a);
   const right = normId(b);
-  if (!left || !right) return false;
-  return left === right || left.startsWith(right) || right.startsWith(left);
+  return Boolean(left && right && left === right);
 };
 
 const isSenderEvent = (event, trialMeta) => {
   if (!trialMeta) return false;
-  if (trialMeta.senderDeviceId && idsMatch(event.deviceId, trialMeta.senderDeviceId)) return true;
-  if (trialMeta.senderMeshUserId && idsMatch(event.meshUserId, trialMeta.senderMeshUserId)) {
-    return true;
+  if (trialMeta.senderDeviceId && event.deviceId) {
+    return idsMatch(event.deviceId, trialMeta.senderDeviceId);
+  }
+  if (trialMeta.senderMeshUserId && event.meshUserId) {
+    return idsMatch(event.meshUserId, trialMeta.senderMeshUserId);
   }
   return false;
 };

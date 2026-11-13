@@ -16,6 +16,7 @@ import sosRoutes from './routes/sos.routes.js';
 import clusterRoutes from './routes/cluster.routes.js';
 import voteRoutes from './routes/vote.routes.js';
 import radarRoutes from './routes/radar.routes.js';
+import experimentRoutes from './routes/experiment.routes.js';
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/sos', sosRoutes);
 app.use('/clusters', clusterRoutes);
 app.use('/votes', voteRoutes);
 app.use('/radar', radarRoutes);
+app.use('/experiments', experimentRoutes);
 app.use('/api', indexRoutes);
 
 app.use(notFound);

@@ -49,6 +49,18 @@ import {
   analyticsQuerySchema,
 } from '../validators/adminOps.validators.js';
 import { radarGatewayIdParamsSchema } from '../validators/radar.validators.js';
+import {
+  experimentIdParamsSchema,
+  experimentListQuerySchema,
+  trialListQuerySchema,
+} from '../validators/experiment.validators.js';
+import {
+  adminListExperiments,
+  adminGetExperiment,
+  adminGetExperimentTrials,
+  adminGetExperimentEvents,
+  adminGetExperimentReport,
+} from '../controllers/adminExperiment.controller.js';
 
 const router = Router();
 
@@ -196,6 +208,40 @@ router.get(
   ...adminGuard,
   validateRequest({ params: radarGatewayIdParamsSchema }),
   getRadarGatewayById
+);
+
+router.get(
+  '/experiments',
+  ...adminGuard,
+  validateRequest({ query: experimentListQuerySchema }),
+  adminListExperiments
+);
+router.get(
+  '/experiments/:experimentId/report',
+  ...adminGuard,
+  validateRequest({ params: experimentIdParamsSchema }),
+  adminGetExperimentReport
+);
+router.get(
+  '/experiments/:experimentId/trials',
+  ...adminGuard,
+  validateRequest({
+    params: experimentIdParamsSchema,
+    query: trialListQuerySchema,
+  }),
+  adminGetExperimentTrials
+);
+router.get(
+  '/experiments/:experimentId/events',
+  ...adminGuard,
+  validateRequest({ params: experimentIdParamsSchema }),
+  adminGetExperimentEvents
+);
+router.get(
+  '/experiments/:experimentId',
+  ...adminGuard,
+  validateRequest({ params: experimentIdParamsSchema }),
+  adminGetExperiment
 );
 
 export default router;

@@ -9,6 +9,8 @@ import ClusterDetailPage from './pages/ClusterDetailPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import LiveRadarPage from './pages/LiveRadarPage.jsx';
+import ExperimentAnalyticsPage from './pages/ExperimentAnalyticsPage.jsx';
+import ExperimentDetailPage from './pages/ExperimentDetailPage.jsx';
 
 function App() {
   return (
@@ -25,6 +27,11 @@ function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/live-radar" element={<LiveRadarPage />} />
+          <Route path="/experiments" element={<ExperimentAnalyticsPage />} />
+          <Route
+            path="/experiments/:experimentId"
+            element={<ExperimentDetailPage />}
+          />
         </Route>
       </Route>
 

@@ -10,6 +10,7 @@ export const adminNavItems = [
   { to: '/users', label: 'Users' },
   { to: '/reports', label: 'Reports' },
   { to: '/live-radar', label: 'Live Radar' },
+  { to: '/experiments', label: 'Experiment Analytics' },
 ];
 
 const AdminLayoutChrome = () => {

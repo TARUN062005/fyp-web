@@ -265,12 +265,26 @@ export const ingestEventBatch = async (userId, experimentId, body) => {
       rejectedReasons.push(`${event.eventId}:device_mismatch`);
       continue;
     }
-    valid.push({
+    const payload = {
       ...event,
       experimentId,
       userId,
       extra: event.extra,
-    });
+    };
+    try {
+      const doc = new ExperimentEvent(payload);
+      const validation = doc.validateSync();
+      if (validation) {
+        rejectedReasons.push(`${event.eventId}:invalid`);
+        continue;
+      }
+    } catch (err) {
+      rejectedReasons.push(
+        `${event.eventId}:invalid:${err?.message || 'validation'}`
+      );
+      continue;
+    }
+    valid.push(payload);
   }
 
   let insertedCount = 0;

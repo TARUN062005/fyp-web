@@ -267,6 +267,97 @@ describe('experiment metrics', () => {
     assert.equal(trial.hopCount, 1);
   });
 
+  it('does not use cloud HTTP errors as mesh delivery failure', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'CLOUD_UPLOAD_FAILED',
+        deviceId: 'dev-a',
+        errorCode: 'http_500',
+        wallClockMs: 1300,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events);
+    assert.equal(trial.delivered, false);
+    assert.equal(trial.failureReason, 'destination_receipt_not_confirmed');
+    assert.equal(trial.cloudUploadStatus, 'FAILED');
+  });
+
+  it('destination receipt wins even when cloud upload returned HTTP 500', () => {
+    const events = [
+      ev({
+        eventId: '1',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1000,
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'MESSAGE_RECEIVED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        hopCount: 1,
+        wallClockMs: 1200,
+      }),
+      ev({
+        eventId: '3',
+        eventType: 'CLOUD_UPLOAD_FAILED',
+        deviceId: 'dev-b',
+        errorCode: 'http_500',
+        wallClockMs: 1400,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events, [
+      { role: 'RECEIVER', deviceId: 'dev-b', meshUserId: 'mesh-b' },
+    ]);
+    assert.equal(trial.delivered, true);
+    assert.equal(trial.failureReason, null);
+  });
+
+  it('receiver TRIAL_STARTED earlier than sender does not steal sender identity', () => {
+    const events = [
+      ev({
+        eventId: '0',
+        eventType: 'TRIAL_STARTED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        wallClockMs: 900,
+      }),
+      ev({
+        eventId: '1',
+        eventType: 'MESSAGE_CREATED',
+        deviceId: 'dev-a',
+        sourceDeviceId: 'dev-a',
+        meshUserId: 'mesh-a',
+        wallClockMs: 1010,
+      }),
+      ev({
+        eventId: '2',
+        eventType: 'MESSAGE_RECEIVED',
+        deviceId: 'dev-b',
+        meshUserId: 'mesh-b',
+        hopCount: 1,
+        wallClockMs: 1200,
+      }),
+    ];
+    const trial = reconstructTrial('trial-1', events, [
+      { role: 'RECEIVER', deviceId: 'dev-b', meshUserId: 'mesh-b' },
+    ]);
+    assert.equal(trial.senderDeviceId, 'dev-a');
+    assert.equal(trial.delivered, true);
+    assert.equal(trial.failureReason, null);
+  });
+
   it('does not treat sender MESSAGE_DELIVERED as destination receipt', () => {
     const events = [
       ev({

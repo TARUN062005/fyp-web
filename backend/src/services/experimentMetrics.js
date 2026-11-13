@@ -100,18 +100,31 @@ const firstExtraValue = (events, key) => {
 
 const trialMetaFromEvents = (events) => {
   const created = events.find((e) => e.eventType === 'MESSAGE_CREATED');
-  const started = events.find((e) => e.eventType === 'TRIAL_STARTED');
-  const seed = started || created || events[0];
+  // Receiver phones also emit TRIAL_STARTED when they adopt the sender's trial.
+  // Sender identity must come from MESSAGE_CREATED, never the earliest TRIAL_STARTED.
+  const senderStarted = created
+    ? events.find(
+        (e) =>
+          e.eventType === 'TRIAL_STARTED' &&
+          (idsMatch(e.deviceId, created.deviceId) ||
+            idsMatch(e.meshUserId, created.meshUserId))
+      )
+    : events.find((e) => e.eventType === 'TRIAL_STARTED');
+  const seed = created || senderStarted || events[0];
   return {
-    senderDeviceId: seed?.sourceDeviceId || seed?.deviceId || null,
+    senderDeviceId: created?.sourceDeviceId || created?.deviceId || seed?.sourceDeviceId || seed?.deviceId || null,
     destinationDeviceId:
+      created?.destinationDeviceId ||
       seed?.destinationDeviceId ||
       events.find((e) => e.destinationDeviceId)?.destinationDeviceId ||
       null,
     destinationMeshUserId: firstExtraValue(events, 'destinationMeshUserId'),
     senderMeshUserId:
-      seed?.meshUserId || firstExtraValue(events, 'senderMeshUserId') || null,
-    scenario: seed?.scenario || null,
+      created?.meshUserId ||
+      seed?.meshUserId ||
+      firstExtraValue(events, 'senderMeshUserId') ||
+      null,
+    scenario: created?.scenario || seed?.scenario || null,
     messageId: created?.messageId || events.find((e) => e.messageId)?.messageId || null,
     skipped: events.some((e) => e.eventType === 'TRIAL_SKIPPED'),
   };
@@ -196,10 +209,11 @@ export const reconstructTrial = (trialId, events, devices = []) => {
   let failureReason = null;
   if (meta.skipped) failureReason = 'skipped';
   else if (!delivered) {
+    // Cloud HTTP errors are a separate relay-upload metric. They must never
+    // masquerade as the mesh delivery outcome for this trial.
     failureReason =
       hopLimit?.errorCode ||
       expired?.errorCode ||
-      cloudFail[0]?.errorCode ||
       'destination_receipt_not_confirmed';
   }
 

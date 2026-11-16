@@ -245,12 +245,14 @@ export const ingestEventBatch = async (userId, experimentId, body) => {
   const experiment = await Experiment.findOne({ experimentId });
   if (!experiment) throw httpError(404, 'Experiment not found');
 
-  const device = await ExperimentDevice.findOne({
+  const isOwner = String(experiment.createdByUserId) === String(userId);
+  let device = await ExperimentDevice.findOne({
     experimentId,
-    userId,
     deviceId: body.deviceId,
   });
-  const isOwner = String(experiment.createdByUserId) === String(userId);
+  if (!device) {
+    device = await ExperimentDevice.findOne({ experimentId, userId });
+  }
   if (!device && !isOwner) {
     throw httpError(403, 'Device is not registered on this experiment');
   }

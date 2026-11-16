@@ -4,7 +4,6 @@ import {
   refreshAuth,
   logoutAuth,
 } from '../controllers/auth.controller.js';
-import { sensitiveRateLimiter } from '../middleware/rateLimiter.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {
   googleAuthBodySchema,
@@ -15,14 +14,12 @@ const router = Router();
 
 router.post(
   '/google',
-  sensitiveRateLimiter,
   validateRequest({ body: googleAuthBodySchema }),
   googleAuth
 );
 
 router.post(
   '/refresh',
-  sensitiveRateLimiter,
   validateRequest({ body: mobileRefreshBodySchema }),
   refreshAuth
 );

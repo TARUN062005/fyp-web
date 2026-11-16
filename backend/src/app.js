@@ -5,7 +5,6 @@ import env from './config/env.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
-import { generalRateLimiter } from './middleware/rateLimiter.js';
 import { getHealth } from './controllers/health.controller.js';
 import indexRoutes from './routes/index.js';
 import authRoutes from './routes/auth.routes.js';
@@ -42,7 +41,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
-app.use(generalRateLimiter);
 
 app.get('/health', getHealth);
 app.use('/auth', authRoutes);

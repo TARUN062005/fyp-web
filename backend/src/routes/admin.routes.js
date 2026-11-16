@@ -28,7 +28,6 @@ import {
 import { authenticateAdmin } from '../middleware/authenticateAdmin.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { auditLog } from '../middleware/auditLog.js';
-import { sensitiveRateLimiter } from '../middleware/rateLimiter.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {
   adminLoginBodySchema,
@@ -67,13 +66,11 @@ const router = Router();
 
 router.post(
   '/auth/login',
-  sensitiveRateLimiter,
   validateRequest({ body: adminLoginBodySchema }),
   adminLogin
 );
 router.post(
   '/auth/refresh',
-  sensitiveRateLimiter,
   validateRequest({ body: adminRefreshBodySchema }),
   adminRefresh
 );

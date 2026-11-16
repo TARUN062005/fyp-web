@@ -179,17 +179,20 @@ export const authenticateWithGoogle = async (
   const fingerprint =
     publicKeyFingerprint?.trim() || fingerprintPublicKey(publicKey);
 
+  const createFields = {
+    googleAccountId,
+    displayName: displayName || 'User',
+    publicKey,
+    publicKeyFingerprint: fingerprint,
+    isVerified: true,
+    lastSeenAt: new Date(),
+  };
+  const mesh = normalizeMeshUserId(meshUserId);
+  if (mesh) createFields.meshUserId = mesh;
+
   let user;
   try {
-    user = await createUserWithUniqueEmergencyId({
-      googleAccountId,
-      displayName: displayName || 'User',
-      publicKey,
-      publicKeyFingerprint: fingerprint,
-      isVerified: true,
-      lastSeenAt: new Date(),
-      meshUserId: normalizeMeshUserId(meshUserId),
-    });
+    user = await createUserWithUniqueEmergencyId(createFields);
   } catch (err) {
     if (err?.code === 11000) {
       const raced = await User.findOne({ googleAccountId });
@@ -209,8 +212,15 @@ export const authenticateWithGoogle = async (
           }),
         };
       }
+      if (err?.keyPattern?.meshUserId && createFields.meshUserId) {
+        delete createFields.meshUserId;
+        user = await createUserWithUniqueEmergencyId(createFields);
+      } else {
+        throw new AppError('Could not create identity for this Google account', 500);
+      }
+    } else {
+      throw err;
     }
-    throw err;
   }
 
   const certificate = await issueCertificate(user.emergencyId, publicKey);

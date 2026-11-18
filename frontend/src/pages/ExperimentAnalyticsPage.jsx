@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteExperiment,
+  downloadAllExperimentsPdf,
   experimentsQueryKey,
   fetchExperiments,
 } from '../services/experimentService.js';
@@ -30,6 +31,8 @@ const ExperimentAnalyticsPage = () => {
   const [scenario, setScenario] = useState('');
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [downloadingAll, setDownloadingAll] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
   const params = useMemo(
     () => ({
       page: 1,
@@ -70,6 +73,24 @@ const ExperimentAnalyticsPage = () => {
             mixed into this view.
           </p>
         </div>
+        <button
+          type="button"
+          className="border border-admin-line bg-admin-panel px-3 py-2 text-sm font-medium"
+          disabled={downloadingAll}
+          onClick={async () => {
+            setDownloadingAll(true);
+            setDownloadError(null);
+            try {
+              await downloadAllExperimentsPdf();
+            } catch (err) {
+              setDownloadError(err);
+            } finally {
+              setDownloadingAll(false);
+            }
+          }}
+        >
+          {downloadingAll ? 'Preparing PDF…' : 'Download all experiments PDF'}
+        </button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -106,6 +127,7 @@ const ExperimentAnalyticsPage = () => {
       {query.isLoading ? <LoadingNotice>Loading experiments…</LoadingNotice> : null}
       {query.isError ? <ErrorAlert error={query.error} /> : null}
       {deleteError ? <ErrorAlert error={deleteError} /> : null}
+      {downloadError ? <ErrorAlert error={downloadError} /> : null}
       {!query.isLoading && !items.length ? (
         <EmptyNotice>
           No physical-device experiments uploaded yet. Create an experiment in the

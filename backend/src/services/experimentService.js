@@ -336,6 +336,57 @@ export const ingestEventBatch = async (userId, experimentId, body) => {
   };
 };
 
+export const loadAllExperimentBundles = async ({ limit = 100 } = {}) => {
+  const cap = Math.min(200, Math.max(1, Number(limit) || 100));
+  const experiments = await Experiment.find({})
+    .sort({ createdAt: 1 })
+    .limit(cap)
+    .lean();
+  const experimentIds = experiments.map((e) => e.experimentId);
+  if (!experimentIds.length) return [];
+
+  const [devices, events, audits] = await Promise.all([
+    ExperimentDevice.find({ experimentId: { $in: experimentIds } }).lean(),
+    ExperimentEvent.find({ experimentId: { $in: experimentIds } }).sort({ wallClockMs: 1 }).lean(),
+    ExperimentUploadAudit.find({ experimentId: { $in: experimentIds } })
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+
+  const devicesByExp = new Map();
+  for (const d of devices) {
+    if (!devicesByExp.has(d.experimentId)) devicesByExp.set(d.experimentId, []);
+    devicesByExp.get(d.experimentId).push(d);
+  }
+  const eventsByExp = new Map();
+  for (const ev of events) {
+    if (!eventsByExp.has(ev.experimentId)) eventsByExp.set(ev.experimentId, []);
+    eventsByExp.get(ev.experimentId).push(ev);
+  }
+  const auditsByExp = new Map();
+  for (const a of audits) {
+    if (!auditsByExp.has(a.experimentId)) auditsByExp.set(a.experimentId, []);
+    const list = auditsByExp.get(a.experimentId);
+    if (list.length < 50) list.push(a);
+  }
+
+  return experiments.map((experiment) => {
+    const expDevices = devicesByExp.get(experiment.experimentId) || [];
+    const expEvents = eventsByExp.get(experiment.experimentId) || [];
+    const calculated = calculateExperimentResults(expEvents, expDevices);
+    return {
+      experiment: {
+        ...experiment,
+        measurementKind: MEASUREMENT_KIND_PHYSICAL,
+      },
+      devices: expDevices,
+      events: expEvents,
+      audits: auditsByExp.get(experiment.experimentId) || [],
+      ...calculated,
+    };
+  });
+};
+
 export const loadExperimentBundle = async (experimentId) => {
   const experiment = await Experiment.findOne({ experimentId }).lean();
   if (!experiment) throw httpError(404, 'Experiment not found');

@@ -70,36 +70,15 @@ const barChart = (doc, title, rows, valueKey, unit = '') => {
   doc.moveDown(0.3);
 };
 
-export const buildExperimentPdfBuffer = (bundle) => {
-  const { experiment, devices, trials, summary, byScenario, audits } = bundle;
-  const generatedAt = new Date();
-  const dateStamp = generatedAt.toISOString().slice(0, 10);
-
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: 'A4',
-      compress: false,
-      margins: { top: 48, bottom: 48, left: 48, right: 48 },
-      info: {
-        Title: `EmergencyDTN Experiment Report ${experiment.experimentId}`,
-        Author: 'EmergencyDTN',
-        Subject: 'Physical Android device experiment results',
-      },
-    });
-    const chunks = [];
-    doc.on('data', (c) => chunks.push(c));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
-    doc.font('Helvetica-Bold').fontSize(16).text('EmergencyDTN');
-    doc.font('Helvetica').fontSize(11).text('Physical-device experiment report');
-    doc.moveDown(0.4);
-    doc.fontSize(8).fillColor('#555555').text(
-      'This report uses backend-validated event records from physical Android phones. ' +
-        'It does not include simulator results. Missing measurements are shown as unavailable — never as zero.'
-    );
-    doc.fillColor('#222222');
-
+const writeExperimentBody = (doc, bundle, generatedAt) => {
+  const {
+    experiment,
+    devices = [],
+    trials = [],
+    summary = {},
+    byScenario = {},
+    audits = [],
+  } = bundle;
     drawSection(doc, '1. Experiment identification');
     drawKv(doc, 'Experiment title', experiment.name);
     drawKv(doc, 'Experiment ID', experiment.experimentId);
@@ -251,16 +230,149 @@ export const buildExperimentPdfBuffer = (bundle) => {
       }
     }
 
-    doc.moveDown(1);
-    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#555555').text(
-      `Generated ${iso(generatedAt)} · filename EmergencyDTN_Experiment_Report_${dateStamp}.pdf`
-    );
+};
 
+const createPdfDocument = (title, subject) => {
+  const doc = new PDFDocument({
+    size: 'A4',
+    compress: false,
+    margins: { top: 48, bottom: 48, left: 48, right: 48 },
+    info: {
+      Title: title,
+      Author: 'EmergencyDTN',
+      Subject: subject,
+    },
+  });
+  return doc;
+};
+
+const pdfBufferFromDoc = (doc, write) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on('data', (c) => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    write(doc);
     doc.end();
   });
+
+export const buildExperimentPdfBuffer = (bundle) => {
+  const generatedAt = new Date();
+  const dateStamp = generatedAt.toISOString().slice(0, 10);
+  return pdfBufferFromDoc(
+    createPdfDocument(
+      `EmergencyDTN Experiment Report ${bundle.experiment.experimentId}`,
+      'Physical Android device experiment results'
+    ),
+    (doc) => {
+      doc.font('Helvetica-Bold').fontSize(16).text('EmergencyDTN');
+      doc.font('Helvetica').fontSize(11).text('Physical-device experiment report');
+      doc.moveDown(0.4);
+      doc.fontSize(8).fillColor('#555555').text(
+        'This report uses backend-validated event records from physical Android phones. ' +
+          'It does not include simulator results. Missing measurements are shown as unavailable — never as zero.'
+      );
+      doc.fillColor('#222222');
+      writeExperimentBody(doc, bundle, generatedAt);
+      doc.moveDown(1);
+      doc.font('Helvetica-Oblique').fontSize(8).fillColor('#555555').text(
+        `Generated ${iso(generatedAt)} · filename EmergencyDTN_Experiment_Report_${dateStamp}.pdf`
+      );
+    }
+  );
+};
+
+const outcomeLabel = (summary) => {
+  const ok = summary?.successfulDeliveries || 0;
+  const fail = summary?.failedTrialCount || 0;
+  const total = summary?.totalTrialCount || 0;
+  if (!total) return 'no trials';
+  if (fail === 0 && ok > 0) return 'succeeded';
+  if (ok === 0) return 'failed';
+  return 'partial';
+};
+
+export const buildAllExperimentsPdfBuffer = (bundles = []) => {
+  const generatedAt = new Date();
+  const dateStamp = generatedAt.toISOString().slice(0, 10);
+  return pdfBufferFromDoc(
+    createPdfDocument(
+      'EmergencyDTN All Experiments Report',
+      'Physical Android device experiment archive'
+    ),
+    (doc) => {
+      doc.font('Helvetica-Bold').fontSize(16).text('EmergencyDTN');
+      doc.font('Helvetica').fontSize(12).text('All physical-device experiments');
+      doc.moveDown(0.3);
+      doc.fontSize(8).fillColor('#555555').text(
+        'Single archive of every experiment stored on the ops console. ' +
+          'Each experiment includes its name, devices, aggregate metrics, charts, and trial-level results. ' +
+          'Missing measurements are shown as unavailable — never as zero. Simulator results are not included.'
+      );
+      doc.fillColor('#222222');
+      doc.moveDown(0.4);
+      drawKv(doc, 'Experiments in this PDF', bundles.length);
+      drawKv(doc, 'Generated', iso(generatedAt));
+      drawKv(doc, 'Measurement kind', 'PHYSICAL_ANDROID (not simulation)');
+
+      drawSection(doc, 'Catalogue — names and results');
+      if (!bundles.length) {
+        doc.font('Helvetica-Oblique').text('No experiments have been uploaded yet.');
+      } else {
+        bundles.forEach((bundle, index) => {
+          if (doc.y > 680) doc.addPage();
+          const exp = bundle.experiment;
+          const s = bundle.summary || {};
+          doc.font('Helvetica-Bold').fontSize(10).text(
+            `${index + 1}. ${exp.name || 'Untitled experiment'}`
+          );
+          drawKv(doc, 'Experiment ID', exp.experimentId);
+          drawKv(doc, 'Scenario', exp.scenario || '—');
+          drawKv(doc, 'Status', exp.status || '—');
+          drawKv(doc, 'Result', outcomeLabel(s));
+          drawKv(doc, 'Delivery ratio', fmtPct(s.deliveryRatio));
+          drawKv(
+            doc,
+            'Trials',
+            `${fmt(s.successfulDeliveries)} succeeded / ${fmt(s.failedTrialCount)} failed / ${fmt(s.totalTrialCount)} total`
+          );
+          drawKv(doc, 'Average latency', fmtMs(s.averageLatencyMs));
+          drawKv(doc, 'Average hops', fmt(s.averageHopCount));
+          drawKv(doc, 'Duplicate suppression', fmt(s.duplicateSuppressionCount));
+          drawKv(doc, 'Forwards', fmt(s.forwardingAttempts));
+          drawKv(doc, 'Cloud relay success', fmtPct(s.cloudRelaySuccessRate));
+          drawKv(doc, 'Started', iso(exp.startedAt || exp.createdAt));
+          doc.moveDown(0.4);
+        });
+      }
+
+      bundles.forEach((bundle, index) => {
+        doc.addPage();
+        const exp = bundle.experiment;
+        doc.font('Helvetica-Bold').fontSize(14).text(
+          `Experiment ${index + 1} of ${bundles.length}: ${exp.name || 'Untitled experiment'}`
+        );
+        doc.font('Helvetica').fontSize(9).fillColor('#555555').text(
+          `${outcomeLabel(bundle.summary)} · ${exp.scenario || '—'} · ${exp.experimentId}`
+        );
+        doc.fillColor('#222222');
+        writeExperimentBody(doc, bundle, generatedAt);
+      });
+
+      doc.moveDown(1);
+      doc.font('Helvetica-Oblique').fontSize(8).fillColor('#555555').text(
+        `Generated ${iso(generatedAt)} · filename EmergencyDTN_All_Experiments_${dateStamp}.pdf`
+      );
+    }
+  );
 };
 
 export const experimentReportFilename = (date = new Date()) => {
   const stamp = date.toISOString().slice(0, 10);
   return `EmergencyDTN_Experiment_Report_${stamp}.pdf`;
+};
+
+export const allExperimentsReportFilename = (date = new Date()) => {
+  const stamp = date.toISOString().slice(0, 10);
+  return `EmergencyDTN_All_Experiments_${stamp}.pdf`;
 };

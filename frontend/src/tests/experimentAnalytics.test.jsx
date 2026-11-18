@@ -28,6 +28,7 @@ vi.mock('../services/experimentService.js', () => ({
   fetchExperiment: vi.fn(),
   fetchExperimentTrials: vi.fn(),
   downloadExperimentPdf: vi.fn(),
+  downloadAllExperimentsPdf: vi.fn(),
   deleteExperiment: vi.fn(),
 }));
 
@@ -35,6 +36,7 @@ import {
   fetchExperiments,
   fetchExperiment,
   fetchExperimentTrials,
+  downloadAllExperimentsPdf,
 } from '../services/experimentService.js';
 
 const wrapper = (ui, path = '/experiments') => {
@@ -55,6 +57,7 @@ describe('Experiment Analytics', () => {
     fetchExperiments.mockReset();
     fetchExperiment.mockReset();
     fetchExperimentTrials.mockReset();
+    downloadAllExperimentsPdf.mockReset();
   });
 
   it('includes Experiment Analytics in the admin nav and route', () => {
@@ -85,7 +88,35 @@ describe('Experiment Analytics', () => {
     expect(
       await screen.findByText(/No physical-device experiments uploaded yet/i)
     ).toBeTruthy();
+    expect(screen.getByRole('button', { name: /download all experiments pdf/i })).toBeTruthy();
     expect(screen.queryByText('SIMULATION')).toBeNull();
+  });
+
+  it('downloads every experiment into one PDF from analytics', async () => {
+    fetchExperiments.mockResolvedValue({
+      items: [
+        {
+          experimentId: 'exp-1',
+          name: 'Lab Test 1 Direct',
+          scenario: 'DIRECT_BROADCAST',
+          status: 'COMPLETED',
+          participatingDevices: 2,
+          trialCount: 1,
+          successfulDeliveries: 1,
+          failedDeliveries: 0,
+          deliveryRatio: 100,
+          createdAt: '2026-11-13T10:00:00.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 50,
+    });
+    downloadAllExperimentsPdf.mockResolvedValue({ filename: 'EmergencyDTN_All_Experiments_2026-11-13.pdf' });
+    wrapper(<ExperimentAnalyticsPage />);
+    expect(await screen.findByText('Lab Test 1 Direct')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /download all experiments pdf/i }));
+    expect(downloadAllExperimentsPdf).toHaveBeenCalledTimes(1);
   });
 
   it('renders backend metrics and PDF button for an experiment', async () => {

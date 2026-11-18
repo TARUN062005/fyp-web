@@ -49,3 +49,12 @@ export const downloadExperimentPdf = async (experimentId) => {
   downloadBlob(blob, filename);
   return { blob, filename };
 };
+
+export const downloadAllExperimentsPdf = async () => {
+  const res = await api.get('/admin/experiments/report-all', { responseType: 'blob' });
+  const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/pdf' });
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = `EmergencyDTN_All_Experiments_${date}.pdf`;
+  downloadBlob(blob, filename);
+  return { blob, filename };
+};

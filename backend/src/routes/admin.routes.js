@@ -59,6 +59,7 @@ import {
   adminGetExperimentTrials,
   adminGetExperimentEvents,
   adminGetExperimentReport,
+  adminGetAllExperimentsReport,
   adminDeleteExperiment,
 } from '../controllers/adminExperiment.controller.js';
 
@@ -213,6 +214,11 @@ router.get(
   ...adminGuard,
   validateRequest({ query: experimentListQuerySchema }),
   adminListExperiments
+);
+router.get(
+  '/experiments/report-all',
+  ...adminGuard,
+  adminGetAllExperimentsReport
 );
 router.get(
   '/experiments/:experimentId/report',

@@ -3,12 +3,15 @@ import { ApiResponse } from '../utils/apiResponse.js';
 import {
   listExperimentsForAdmin,
   loadExperimentBundle,
+  loadAllExperimentBundles,
   paginateTrials,
   deleteExperimentBundle,
 } from '../services/experimentService.js';
 import {
   buildExperimentPdfBuffer,
+  buildAllExperimentsPdfBuffer,
   experimentReportFilename,
+  allExperimentsReportFilename,
 } from '../services/experimentReportPdf.js';
 
 export const adminListExperiments = asyncHandler(async (req, res) => {
@@ -59,6 +62,15 @@ export const adminGetExperimentReport = asyncHandler(async (req, res) => {
   const bundle = await loadExperimentBundle(req.params.experimentId);
   const pdf = await buildExperimentPdfBuffer(bundle);
   const filename = experimentReportFilename();
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  return res.status(200).send(pdf);
+});
+
+export const adminGetAllExperimentsReport = asyncHandler(async (req, res) => {
+  const bundles = await loadAllExperimentBundles({ limit: 200 });
+  const pdf = await buildAllExperimentsPdfBuffer(bundles);
+  const filename = allExperimentsReportFilename();
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   return res.status(200).send(pdf);

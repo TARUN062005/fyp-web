@@ -15,6 +15,7 @@ import {
   fingerprintPublicKey,
   verifyEmergencyCloudSignature,
 } from '../security/emergencyCanonical.js';
+import { verifyHopStampChain } from '../security/hopStamp.js';
 
 /** Allow limited future skew for device clock drift. */
 const FUTURE_SKEW_MS =
@@ -154,10 +155,13 @@ const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
     report: toReportDto(existing),
   });
 
+  await User.updateOne({ _id: uploaderId }, { $inc: { uploadAcceptCount: 1 } });
+
   return {
     report: toReportDto(existing),
     created: false,
     deduplicated: true,
+    corroboration: corroborationSignals(uploaders, existing.originalSenderId),
   };
 };
 
@@ -227,6 +231,7 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     batteryPercentage,
     senderPublicKey,
     signature,
+    hopStamps,
   } = payload;
 
   const uploaderId = String(authenticatedUserId);
@@ -267,7 +272,31 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
     fail('emergency signature is invalid', 400, 'INVALID_SIGNATURE');
   }
   if (!signatureOk) {
+    await User.updateOne({ _id: uploaderId }, { $inc: { uploadRejectCount: 1 } }).catch(() => {});
     fail('emergency signature is invalid', 400, 'INVALID_SIGNATURE');
+  }
+
+  if (Array.isArray(hopStamps) && hopStamps.length > 0) {
+    let stampsOk = false;
+    try {
+      stampsOk = verifyHopStampChain({
+        messageId,
+        originId: senderId,
+        originPublicKey: senderPublicKey,
+        stamps: hopStamps,
+        claimedHop: hopCount,
+        maxHop: MAX_HOP_COUNT,
+      });
+    } catch (err) {
+      if (err instanceof CryptoMaterialError) {
+        fail(err.message, 400, 'INVALID_HOP_STAMP');
+      }
+      fail('hop stamp chain is invalid', 400, 'INVALID_HOP_STAMP');
+    }
+    if (!stampsOk) {
+      await User.updateOne({ _id: uploaderId }, { $inc: { uploadRejectCount: 1 } }).catch(() => {});
+      fail('hop stamp chain is invalid', 400, 'INVALID_HOP_STAMP');
+    }
   }
 
   const originUser = await resolveOriginUser(
@@ -342,10 +371,27 @@ export const uploadEmergencyReport = async (payload, authenticatedUserId) => {
 
   await enqueueForClustering(report);
   const linked = await EmergencyReport.findById(report._id);
+  await User.updateOne({ _id: uploaderId }, { $inc: { uploadAcceptCount: 1 } });
 
+  const dto = toReportDto(linked || report);
   return {
-    report: toReportDto(linked || report),
+    report: dto,
     created: true,
     deduplicated: false,
+    corroboration: corroborationSignals(uploaders, originalSenderId),
+  };
+};
+
+/**
+ * Independent uploaders show that more than one registered account presented the
+ * same signed messageId. That is a consistency signal. It does not prove that
+ * the physical emergency occurred.
+ */
+const corroborationSignals = (uploaders, originalSenderId) => {
+  const ids = (uploaders || []).map((id) => String(id));
+  const unique = new Set(ids);
+  return {
+    independentUploaders: unique.size,
+    originUploaded: unique.has(String(originalSenderId)),
   };
 };

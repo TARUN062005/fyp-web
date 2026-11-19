@@ -57,4 +57,15 @@ export const emergencyUploadBodySchema = z.object({
   ),
   senderPublicKey: z.string().min(1).max(128),
   signature: z.string().min(1).max(256),
+  hopStamps: z
+    .array(
+      z.object({
+        hop: z.coerce.number().int().min(0).max(8),
+        relayId: z.string().min(1).max(128),
+        prevHash: z.string().min(1).max(128),
+        publicKey: z.string().min(1).max(128),
+        signature: z.string().min(1).max(256),
+      })
+    )
+    .optional(),
 });

@@ -68,7 +68,19 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       default: null,
     },
-  },
+    /** Successful emergency uploads (origin or relay). Signal only, not proof. */
+    uploadAcceptCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /** Uploads rejected after auth (bad signature / hop stamp). */
+    uploadRejectCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },,
   {
     timestamps: { createdAt: true, updatedAt: true },
     collection: 'users',

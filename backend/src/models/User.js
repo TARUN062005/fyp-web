@@ -80,7 +80,7 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-  },,
+  },
   {
     timestamps: { createdAt: true, updatedAt: true },
     collection: 'users',

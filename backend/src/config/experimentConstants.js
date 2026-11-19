@@ -6,9 +6,16 @@ export const EXPERIMENT_SCENARIOS = [
   'DUPLICATE_SUPPRESSION',
   'OFFLINE_SENDER_TO_INTERNET_RELAY',
   'HOP_LIMIT',
+  'STAMPS_OFF_VS_ON',
+  'ROUTER_COMPARE',
+  'HOP_RESET_ATTACKER',
+  'TRUNCATION_ATTACKER',
+  'SPAM_FLOODER',
+  'BATTERY_SOAK',
+  'CARRY_RELAY',
 ];
 
-export const EXPERIMENT_ROLES = ['SENDER', 'RELAY', 'RECEIVER', 'GATEWAY'];
+export const EXPERIMENT_ROLES = ['SENDER', 'RELAY', 'RECEIVER', 'GATEWAY', 'ATTACKER'];
 
 export const EXPERIMENT_STATUSES = ['ACTIVE', 'PAUSED', 'COMPLETED'];
 
@@ -30,6 +37,21 @@ export const EXPERIMENT_EVENT_TYPES = [
   'TRIAL_STOPPED',
   'TRIAL_SKIPPED',
   'CLOCK_PROBE',
+  'MESSAGE_DROPPED',
+  'ECHO_SENT',
+  'ECHO_RECEIVED',
+  'CONNECTION_ATTEMPTED',
+  'CONNECTION_FAILED',
+  'CONNECTION_CAP_HIT',
+  'FIRST_BYTE',
+  'SAMPLE_BATTERY',
+  'SAMPLE_PROCESS',
+  'RUN_COMPLETE',
+  'CRYPTO_SUMMARY',
+  'CONFIG_SNAPSHOT',
+  'CONNECTION_REJECTED',
+  'CARRY_START',
+  'CARRY_ARRIVE',
 ];
 
 export const MEASUREMENT_KIND_PHYSICAL = 'PHYSICAL_ANDROID';
@@ -64,11 +86,13 @@ export const METRIC_DEFINITIONS = {
   averageHopCount:
     'Mean of actual final hop counts recorded at destination reception for successful deliveries.',
   duplicateSuppressionCount:
-    'Count of DUPLICATE_DETECTED events for unique (trialId, messageId) pairs that were suppressed rather than displayed again.',
+    'Number of unique (trialId, messageId) pairs with at least one DUPLICATE_DETECTED event.',
   forwardingAttempts:
-    'Count of MESSAGE_FORWARDED plus MESSAGE_TRANSMISSION_ATTEMPTED events.',
+    'Count of MESSAGE_TRANSMISSION_ATTEMPTED events (raw send attempts including retries).',
+  distinctForwards:
+    'Count of MESSAGE_FORWARDED events (successful transmissions).',
   routingOverhead:
-    '(MESSAGE_TRANSMISSION_ATTEMPTED + MESSAGE_FORWARDED) / unique successful destination deliveries. Null when there are no successful deliveries. This is an application-specific overhead ratio, not a standardized RFC routing-overhead metric.',
+    'MESSAGE_FORWARDED / unique successful destination deliveries. Null when there are no successful deliveries. Raw attempts are reported separately as forwardingAttempts.',
   cloudRelaySuccessRate:
     'Backend-confirmed CLOUD_UPLOAD_SUCCEEDED events / CLOUD_UPLOAD_STARTED events × 100. Relay reception without backend confirmation is not success.',
   failedTrialCount:

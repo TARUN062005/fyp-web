@@ -229,8 +229,9 @@ describe('experiment metrics', () => {
       }),
     ];
     const { summary } = calculateExperimentResults(events);
-    assert.equal(summary.forwardingAttempts, 2);
-    assert.equal(summary.routingOverhead, 2);
+    assert.equal(summary.forwardingAttempts, 1);
+    assert.equal(summary.distinctForwards, 1);
+    assert.equal(summary.routingOverhead, 1);
   });
 
   it('counts non-sender MESSAGE_DELIVERED when destination ids were not uploaded', () => {

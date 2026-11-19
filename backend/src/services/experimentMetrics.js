@@ -241,12 +241,17 @@ export const reconstructTrial = (trialId, events, devices = []) => {
     delivered,
     skipped: meta.skipped,
     hopCount: destHop,
-    duplicateCount: ordered.filter((e) => e.eventType === 'DUPLICATE_DETECTED').length,
+    duplicateEventCount: ordered.filter((e) => e.eventType === 'DUPLICATE_DETECTED').length,
+    duplicateCount: new Set(
+      ordered
+        .filter((e) => e.eventType === 'DUPLICATE_DETECTED' && e.messageId)
+        .map((e) => e.messageId)
+    ).size,
     forwardingAttempts: ordered.filter(
-      (e) =>
-        e.eventType === 'MESSAGE_FORWARDED' ||
-        e.eventType === 'MESSAGE_TRANSMISSION_ATTEMPTED'
+      (e) => e.eventType === 'MESSAGE_TRANSMISSION_ATTEMPTED'
     ).length,
+    distinctForwards: ordered.filter((e) => e.eventType === 'MESSAGE_FORWARDED').length,
+    hopLimitReachedCount: ordered.filter((e) => e.eventType === 'HOP_LIMIT_REACHED').length,
     acknowledged: Boolean(ack),
     cloudUploadStatus,
     cloudUploaderDeviceId: cloudOk[0]?.deviceId || cloudStarted[0]?.deviceId || null,
@@ -276,8 +281,16 @@ export const summarizeTrials = (trials) => {
     (sum, t) => sum + (t.forwardingAttempts || 0),
     0
   );
+  const distinctForwards = attempted.reduce(
+    (sum, t) => sum + (t.distinctForwards || 0),
+    0
+  );
   const duplicateSuppressionCount = attempted.reduce(
     (sum, t) => sum + (t.duplicateCount || 0),
+    0
+  );
+  const hopLimitReachedCount = attempted.reduce(
+    (sum, t) => sum + (t.hopLimitReachedCount || 0),
     0
   );
 
@@ -291,7 +304,7 @@ export const summarizeTrials = (trials) => {
   const routingOverhead =
     successful.length === 0
       ? null
-      : roundOrNull(forwardingAttempts / successful.length, 3);
+      : roundOrNull(distinctForwards / successful.length, 3);
 
   return {
     totalTrialCount: attempted.length,
@@ -306,6 +319,8 @@ export const summarizeTrials = (trials) => {
     averageHopCount: roundOrNull(mean(hops), 2),
     duplicateSuppressionCount,
     forwardingAttempts,
+    distinctForwards,
+    hopLimitReachedCount,
     routingOverhead,
     cloudRelayAttempted: cloudAttempted,
     cloudRelaySucceeded: cloudSucceeded,

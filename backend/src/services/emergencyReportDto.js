@@ -1,6 +1,11 @@
 /**
  * Shared EmergencyReport → API DTO mapper (upload + admin + consensus).
  */
+const asHopCount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+};
+
 const asUserSummary = (value) => {
   if (!value) return null;
   if (typeof value === 'object' && (value._id || value.id)) {
@@ -46,7 +51,7 @@ export const toEmergencyReportDto = (report) => {
     uploadersDetail,
     uploadCount: Number(report.uploadCount) || uploaders.length || 1,
     relayCount: Number(report.relayCount) || 0,
-    hopCount: Number(report.hopCount) || 0,
+    hopCount: asHopCount(report.hopCount),
     firstUploadedAt: report.firstUploadedAt || report.createdAt || null,
     lastUploadedAt: report.lastUploadedAt || report.createdAt || null,
     syncStatus: report.syncStatus || 'PENDING_CONSENSUS',

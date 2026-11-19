@@ -107,7 +107,10 @@ const ReportDetailPanel = ({ report, onClose, onDelete }) => {
           <dt className="text-xs text-admin-muted">Counts</dt>
           <dd className="font-mono text-xs">
             uploads {report.uploadCount ?? 1} · relays {report.relayCount ?? 0} ·
-            hops {report.hopCount ?? 0}
+            hops{' '}
+            {Number.isFinite(Number(report.hopCount))
+              ? Number(report.hopCount)
+              : 0}
           </dd>
         </div>
         <div>

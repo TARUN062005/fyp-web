@@ -449,7 +449,7 @@ const ReportsPage = () => {
                   {r.uploadCount ?? 1}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs">
-                  {r.hopCount ?? 0}
+                  {Number.isFinite(Number(r.hopCount)) ? Number(r.hopCount) : 0}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs">
                   {fmt(r.timestamp)}

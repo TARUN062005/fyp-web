@@ -85,6 +85,7 @@ const ClusterReportsTable = ({
             <th className="px-3 py-2 font-medium">Original sender</th>
             <th className="px-3 py-2 font-medium">Uploader</th>
             <th className="px-3 py-2 font-medium">Timestamp</th>
+            <th className="px-3 py-2 font-medium">Hops</th>
             <th className="px-3 py-2 font-medium">Severity</th>
             {onDelete ? (
               <th className="px-3 py-2 font-medium">Actions</th>
@@ -125,6 +126,9 @@ const ClusterReportsTable = ({
                   {personLabel(r.receivedBy, r.uploaderId)}
                 </td>
                 <td className="px-3 py-2 font-mono">{fmt(r.timestamp)}</td>
+                <td className="px-3 py-2 font-mono">
+                  {Number.isFinite(Number(r.hopCount)) ? Number(r.hopCount) : 0}
+                </td>
                 <td className="px-3 py-2">
                   <SeverityBadge severity={r.severity} />
                 </td>

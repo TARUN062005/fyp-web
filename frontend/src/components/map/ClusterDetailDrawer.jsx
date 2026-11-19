@@ -77,6 +77,12 @@ const ClusterDetailDrawer = ({ cluster, onClose }) => {
           <dd className="text-admin-ink">{cluster.emergencyType || '—'}</dd>
           <dt className="text-admin-muted">Reports</dt>
           <dd className="font-mono text-admin-ink">{cluster.reportCount ?? 0}</dd>
+          <dt className="text-admin-muted">Mesh hops</dt>
+          <dd className="font-mono text-admin-ink">
+            {Number.isFinite(Number(cluster.hopCount))
+              ? Number(cluster.hopCount)
+              : 0}
+          </dd>
           <dt className="text-admin-muted">Confidence</dt>
           <dd className="font-mono text-admin-ink">{confidence}</dd>
           <dt className="text-admin-muted">First report</dt>

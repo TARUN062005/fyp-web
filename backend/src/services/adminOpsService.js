@@ -292,6 +292,9 @@ const clusterPublicPayload = (cluster) => ({
   location: cluster.location,
   severity: cluster.severity,
   reportCount: cluster.reportCount,
+  hopCount: Number.isFinite(Number(cluster.hopCount))
+    ? Math.floor(Number(cluster.hopCount))
+    : 0,
   confidenceScore: cluster.confidenceScore,
   firstReportAt: cluster.firstReportAt,
   lastReportAt: cluster.lastReportAt,
@@ -300,7 +303,7 @@ const clusterPublicPayload = (cluster) => ({
 
 const refreshClusterAfterReportRemoval = async (cluster) => {
   const reports = await EmergencyReport.find({ clusterId: cluster._id })
-    .select('severity timestamp')
+    .select('severity timestamp hopCount')
     .lean();
 
   if (reports.length === 0) {
@@ -331,6 +334,11 @@ const refreshClusterAfterReportRemoval = async (cluster) => {
   });
 
   cluster.reportCount = reportCount;
+  cluster.hopCount = reports.reduce((maxHop, row) => {
+    const n = Number(row.hopCount);
+    const hop = Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    return Math.max(maxHop, hop);
+  }, 0);
   cluster.firstReportAt = new Date(Math.min(...timestamps));
   cluster.lastReportAt = new Date(Math.max(...timestamps));
   cluster.confidenceScore = confidenceScore;

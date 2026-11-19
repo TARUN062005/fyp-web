@@ -86,7 +86,11 @@ const ClusterMap = ({ clusters, selectedId, onSelect }) => {
             <Tooltip direction="top" offset={[0, -8]}>
               <span className="font-mono text-xs">
                 {cluster.clusterId} · {getSeverityMark(cluster.severity)}{' '}
-                {cluster.severity} · {cluster.status}
+                {cluster.severity} · hops{' '}
+                {Number.isFinite(Number(cluster.hopCount))
+                  ? Number(cluster.hopCount)
+                  : 0}{' '}
+                · {cluster.status}
               </span>
             </Tooltip>
           </CircleMarker>

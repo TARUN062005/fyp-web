@@ -10,6 +10,11 @@ import {
 } from '../config/clustering.js';
 import { AdminSocketEvents, emitToAdmin } from './adminRealtime.js';
 
+const asHopCount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+};
+
 const toClusterPayload = (cluster) => ({
   id: String(cluster._id),
   clusterId: cluster.clusterId,
@@ -17,6 +22,7 @@ const toClusterPayload = (cluster) => ({
   location: cluster.location,
   severity: cluster.severity,
   reportCount: cluster.reportCount,
+  hopCount: asHopCount(cluster.hopCount),
   confidenceScore: cluster.confidenceScore,
   firstReportAt: cluster.firstReportAt,
   lastReportAt: cluster.lastReportAt,
@@ -233,6 +239,10 @@ export const processReportForClustering = async (report) => {
       });
 
       cluster.reportCount = nextCount;
+      cluster.hopCount = Math.max(
+        asHopCount(cluster.hopCount),
+        asHopCount(report.hopCount)
+      );
       cluster.lastReportAt = new Date(
         Math.max(
           new Date(cluster.lastReportAt).getTime(),
@@ -279,6 +289,7 @@ export const processReportForClustering = async (report) => {
     },
     severity,
     reportCount: 1,
+    hopCount: asHopCount(report.hopCount),
     confidenceScore,
     firstReportAt: report.timestamp,
     lastReportAt: report.timestamp,
@@ -323,16 +334,5 @@ export const listActiveClusters = async ({
     .limit(Math.min(Number(limit) || 50, 200))
     .lean();
 
-  return clusters.map((c) => ({
-    id: String(c._id),
-    clusterId: c.clusterId,
-    emergencyType: c.emergencyType,
-    location: c.location,
-    severity: c.severity,
-    reportCount: c.reportCount,
-    confidenceScore: c.confidenceScore,
-    firstReportAt: c.firstReportAt,
-    lastReportAt: c.lastReportAt,
-    status: c.status,
-  }));
+  return clusters.map((c) => toClusterPayload(c));
 };

@@ -41,6 +41,12 @@ const emergencyClusterSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Max mesh hopCount among linked reports (0–5). */
+    hopCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     confidenceScore: {
       type: Number,
       default: 0,

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import EmergencyReport from '../models/EmergencyReport.js';
+import EmergencyCluster from '../models/EmergencyCluster.js';
 import User from '../models/User.js';
 import { AppError } from '../utils/asyncHandler.js';
 import { enqueueForClustering } from './clusteringService.js';
@@ -142,6 +143,12 @@ const mergeDuplicateUpload = async (existing, uploaderId, hopCount) => {
     existing.firstUploadedAt = existing.createdAt || now;
   }
   await existing.save();
+  if (existing.clusterId) {
+    await EmergencyCluster.updateOne(
+      { _id: existing.clusterId },
+      { $max: { hopCount: nextHop } }
+    );
+  }
 
   emitToAdmin(AdminSocketEvents.REPORT_UPDATED, {
     report: toReportDto(existing),
